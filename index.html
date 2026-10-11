@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌟 دردشة النجوم</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
+  .hidden { display:none !important; }
+
+  body { background:#f4f5f9; min-height:100vh; color:#2d3748; }
+
+  #authScreen { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:16px; background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#b06ab3 100%); }
+  .card { background:#ffffff; border-radius:24px; padding:28px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .card h1 { text-align:center; margin-bottom:6px; font-size:26px; background:linear-gradient(90deg,#667eea,#b06ab3); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .card p.sub { text-align:center; color:#718096; margin-bottom:18px; font-size:13px; }
+
+  .tab-btns { display:flex; gap:8px; margin-bottom:18px; }
+  .tab-btns button { flex:1; padding:10px; font-size:13px; background:#edf2f7; border-radius:12px; border:none; color:#4a5568; cursor:pointer; font-weight:bold; }
+  .tab-btns button.active { background:linear-gradient(90deg,#667eea,#9f7aea); color:#fff; }
+
+  label { display:block; margin-bottom:4px; font-size:13px; color:#4a5568; font-weight:bold; }
+  input, select, textarea { width:100%; padding:11px 14px; border-radius:12px; border:1.5px solid #e2e8f0; background:#f9fafb; color:#2d3748; font-size:14px; margin-bottom:12px; outline:none; transition:.2s; }
+  input:focus, select:focus, textarea:focus { border-color:#9f7aea; box-shadow:0 0 0 3px rgba(159,122,234,.2); background:#fff; }
+
+  button { width:100%; padding:12px; border:none; border-radius:12px; background:linear-gradient(90deg,#667eea,#9f7aea); color:#fff; font-size:15px; font-weight:bold; cursor:pointer; transition:.2s; }
+  button:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(102,126,234,.4); }
+  #authErr { color:#e53e3e; font-size:13px; text-align:center; min-height:18px; margin-bottom:10px; font-weight:bold; }
+
+  .avatar-preview { width:90px; height:90px; border-radius:50%; object-fit:cover; margin:0 auto 10px; display:block; border:3px solid #9f7aea; box-shadow:0 4px 15px rgba(159,122,234,.4); }
+  .avatar-row { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .avatar-row input[type=file] { flex:1; font-size:12px; padding:8px; margin:0; }
+
+  .avatar-container { position:relative; display:inline-block; flex-shrink:0; }
+  .avatar { width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 3px 10px rgba(0,0,0,0.1); }
+  .avatar-fallback { width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#c3b2f0,#9f7aea); display:inline-flex; align-items:center; justify-content:center; font-size:24px; color:#fff; }
+  .status-dot { position:absolute; bottom:2px; right:2px; width:14px; height:14px; background-color:#10b981; border:2.5px solid #fff; border-radius:50%; display:none; }
+  .status-dot.online { display:block; }
+
+  #chatScreen { display:flex; flex-direction:column; height:100vh; max-width:920px; margin:0 auto; position:relative; background:#ffffff; box-shadow:0 0 40px rgba(0,0,0,.1); }
+
+  header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 16px; background:linear-gradient(90deg,#5a4fcf,#9f7aea); color:#fff; flex-shrink:0; }
+  header h2 { font-size:16px; }
+  header .room { font-size:12px; opacity:.9; }
+  .hbtns { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .hbtns button { width:auto; padding:7px 13px; font-size:12px; background:rgba(255,255,255,.18); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:10px; }
+
+  .page { flex:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-height:0; background:#ffffff; }
+
+  .side-panel { background:#fafafa; border-radius:16px; padding:12px; font-size:12px; margin:12px; border:1px solid #f0f0f0; }
+  .side-panel b { display:block; margin-bottom:8px; padding-bottom:6px; font-size:13px; text-align:center; color:#b7791f; border-bottom:2px solid #fef3c7; }
+
+  #topWinnerCard { background:linear-gradient(135deg,#f6e05e,#ed8936); color:#744210; padding:12px; border-radius:12px; margin-bottom:10px; text-align:center; font-weight:bold; }
+  #topWinnerCard .title { font-size:11px; text-transform:uppercase; opacity:.9; }
+  #topWinnerCard .name { font-size:15px; margin:3px 0; color:#2d3748; }
+  #topWinnerCard .pts { background:rgba(255,255,255,.65); color:#2d3748; display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; }
+
+  .user-card-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #f2f3f7; transition:.15s; cursor:pointer; }
+  .user-card-row:hover { background:#faf9fe; }
+  .user-card-right { display:flex; align-items:center; gap:14px; flex:1; min-width:0; }
+  .user-card-info { display:flex; flex-direction:column; gap:3px; flex:1; min-width:0; }
+  .user-card-name { font-size:15px; font-weight:700; color:#1a202c; }
+  .user-card-badges { display:flex; align-items:center; gap:5px; margin:2px 0; }
+  .badge-gender { background:#60a5fa; color:#fff; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:bold; }
+  .user-card-status { font-size:12px; color:#4a5568; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; display:block; }
+
+  .hi-btn {
+    display:inline-flex !important;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    width:auto !important;
+    padding:6px 12px !important;
+    background:#fce7f3;
+    color:#ec4899;
+    border-radius:12px;
+    border:none;
+    font-weight:bold;
+    font-size:11px;
+    cursor:pointer;
+    transition:.2s;
+    flex-shrink:0;
+  }
+  .hi-btn:hover { background:#fbcfe8; transform:scale(1.05); }
+
+  .follow-btn { background:#ede9fe; color:#6b46c1; padding:7px 12px; border-radius:16px; border:none; font-weight:bold; font-size:11px; cursor:pointer; }
+  .follow-btn.following { background:#38a169; color:#fff; }
+
+  .dm-page-scroll { flex:1; overflow-y:auto; padding:16px; background:#ffffff; }
+  .page-header-row { display:flex; align-items:center; justify-content:between; margin-bottom:10px; }
+  .page-title { font-size:18px; font-weight:bold; color:#5a4fcf; }
+
+  .search-id-bar { display:flex; gap:8px; margin-bottom:14px; }
+  .search-id-bar input { margin:0; padding:9px 12px; font-size:13px; }
+  .search-id-bar button { width:auto; padding:0 16px; font-size:13px; border-radius:12px; }
+
+  .filter-tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
+  .filter-tab { padding:6px 14px; font-size:12px; background:#edf2f7; color:#4a5568; border-radius:16px; border:none; white-space:nowrap; cursor:pointer; font-weight:bold; }
+  .filter-tab.active { background:#5a4fcf; color:#fff; }
+
+  .conv-item { display:flex; align-items:center; gap:10px; padding:12px; background:#fff; border:1px solid #f0f0f0; border-radius:14px; margin-bottom:8px; cursor:pointer; transition:.15s; }
+  .conv-item:hover { background:#faf9ff; border-color:#c3b2f0; }
+  .conv-item .c-info { flex:1; display:flex; flex-direction:column; gap:2px; }
+  .conv-item .c-name { font-weight:bold; font-size:14px; color:#2d3748; }
+  .conv-item .c-last { font-size:11px; color:#a0aec0; }
+  .unread-badge { background:#e53e3e; color:#fff; border-radius:50%; min-width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; padding:0 4px; }
+
+  #dmConvView { flex:1; display:flex; flex-direction:column; min-height:0; }
+  #dmConvHeader { display:flex; align-items:center; gap:8px; padding:10px 12px; background:linear-gradient(90deg,#5a4fcf,#9f7aea); color:#fff; flex-shrink:0; }
+  #dmBackBtn { width:auto; padding:6px 12px; font-size:12px; background:rgba(255,255,255,.2); border:none; border-radius:8px; color:#fff; cursor:pointer; }
+  #dmConvTitle { flex:1; font-size:14px; font-weight:bold; }
+  #dmMsgs { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; background:#f8f7ff; }
+  #dmTypingBar { padding:2px 12px 5px; background:#f8f7ff; font-size:11px; color:#6b46c1; font-weight:bold; min-height:17px; }
+  #dmInputBar { display:flex; gap:6px; padding:8px; background:#ffffff; border-top:1.5px solid #ede9fe; align-items:center; }
+  #dmInput { flex:1; margin:0; padding:10px 12px; font-size:14px; }
+  #dmSendBtn { width:auto; padding:10px 14px; font-size:12px; flex-shrink:0; }
+  #dmVoiceBtn { width:auto; padding:9px 13px; font-size:17px; background:linear-gradient(135deg,#ed8936,#dd6b20); border-radius:12px; cursor:pointer; flex-shrink:0; border:none; color:#fff; }
+  #dmEmojiBtn { width:auto; padding:6px 9px; font-size:14px; background:linear-gradient(135deg,#fbd38d,#f6ad55); border-radius:10px; cursor:pointer; flex-shrink:0; border:none; }
+  #dmEmojiPanel { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; padding:8px; background:#fff; border-top:1px solid #ede9fe; max-height:150px; overflow-y:auto; }
+  #dmEmojiPanel span { font-size:22px; text-align:center; cursor:pointer; padding:4px; border-radius:8px; }
+  #dmEmojiPanel span:hover { background:#f3eefe; }
+
+  .msg { max-width:78%; padding:10px 14px; border-radius:18px; word-wrap:break-word; color:#2d3748; direction:rtl; unicode-bidi:normal; line-height:1.6; display:flex; flex-direction:column; }
+  .msg.mine { align-self:flex-start; background:linear-gradient(90deg,#667eea,#9f7aea); color:#fff; border-bottom-left-radius:4px; box-shadow:0 3px 10px rgba(102,126,234,.3); }
+  .msg.theirs { align-self:flex-end; background:#ffffff; border:1.5px solid #e2e8f0; border-bottom-right-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+  .msg.sys { align-self:center; background:#fef3c7; color:#744210; font-size:12px; border:1px solid #f6e05e; border-radius:20px; text-align:center; width:100%; }
+  .msg .msg-avatar { width:22px; height:22px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-left:5px; border:1.5px solid rgba(255,255,255,.7); }
+
+  .msg img.dm-img-thumb { width:110px; height:110px; object-fit:cover; border-radius:10px; display:block; margin-top:5px; cursor:pointer; border:2px solid rgba(255,255,255,0.5); }
+  .msg audio { max-width:200px; margin-top:5px; display:block; }
+
+  #dmActionsBar { display:flex; gap:6px; padding:0 8px 8px; background:#ffffff; border-top:1px solid #ede9fe; }
+  .dm-act-btn { flex:1; padding:9px 6px; font-size:12px; font-weight:bold; border-radius:12px; color:#fff; border:none; cursor:pointer; }
+
+  #gameLobby { flex:1; overflow-y:auto; padding:20px 16px; background:#ffffff; text-align:center; }
+  .game-hero { background:linear-gradient(135deg,#667eea,#9f7aea); color:#fff; border-radius:20px; padding:26px 16px; margin-bottom:16px; box-shadow:0 10px 30px rgba(102,126,234,.35); }
+  .game-hero .g-icon { font-size:52px; }
+  .game-hero h3 { margin:8px 0 4px; font-size:20px; }
+  .game-hero p { font-size:12px; opacity:.9; }
+  #startGameBtn { max-width:280px; margin:14px auto 0; font-size:16px; padding:14px; }
+
+  #gameBoardView { flex:1; display:flex; flex-direction:column; padding:16px; background:#ffffff; overflow-y:auto; }
+  #gameStatusBig { text-align:center; font-size:15px; font-weight:bold; color:#5a4fcf; background:#f9fafb; border:1.5px solid #ede9fe; border-radius:14px; padding:12px; margin-bottom:14px; }
+  #tttBoard { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:340px; margin:0 auto; width:100%; }
+  .ttt-cell { aspect-ratio:1; background:#fff; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:38px; font-weight:bold; cursor:pointer; color:#6b46c1; border:2px solid #c3b2f0; box-shadow:0 4px 12px rgba(159,122,234,.15); }
+
+  .room-card-box { background:linear-gradient(135deg,#fdf2f8,#fae8ff); border:2.5px solid #f472b6; border-radius:20px; padding:20px; margin:16px; text-align:center; cursor:pointer; transition:.2s; box-shadow:0 8px 25px rgba(236,72,153,.15); }
+  .room-card-box:hover { transform:scale(1.02); }
+  .room-card-box h3 { font-size:22px; color:#be185d; margin-bottom:6px; }
+  .room-card-box p { font-size:13px; color:#6b7280; }
+
+  .voice-seats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:380px; margin:20px auto; }
+  .voice-seat { aspect-ratio:1; background:#fff; border-radius:50%; border:3px dashed #c3b2f0; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; position:relative; box-shadow:0 4px 15px rgba(0,0,0,.05); transition:.2s; overflow:hidden; }
+  .voice-seat.occupied { border:3px solid #10b981; background:#f0fdf4; border-style:solid; }
+  .voice-seat.speaking { border-color:#ec4899; box-shadow:0 0 20px rgba(236,72,153,.5); animation: pulseSeat 1s infinite alternate; }
+  @keyframes pulseSeat { from { transform: scale(1); } to { transform: scale(1.05); } }
+  .voice-seat img, .voice-seat .seat-fallback { width:56px; height:56px; border-radius:50%; object-fit:cover; }
+  .voice-seat span.name-label { font-size:11px; font-weight:bold; color:#2d3748; margin-top:2px; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .mic-controls-bar { display:flex; gap:10px; justify-content:center; margin-top:15px; }
+  .mic-ctrl-btn { padding:10px 18px; font-size:13px; border-radius:14px; font-weight:bold; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; color:#fff; }
+  .mic-ctrl-btn.mute { background:#e53e3e; }
+  .mic-ctrl-btn.unmute { background:#38a169; }
+
+  .modal-overlay { position:absolute; inset:0; background:rgba(45,55,72,.45); z-index:80; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .modal-window { background:#ffffff; border-radius:20px; padding:20px; width:100%; max-width:430px; z-index:90; box-shadow:0 20px 50px rgba(0,0,0,.3); text-align:center; max-height:85vh; overflow-y:auto; }
+
+  .admin-section { background:#faf9ff; border:1.5px solid #ede9fe; border-radius:12px; padding:10px; margin-bottom:10px; text-align:right; }
+  .admin-section h4 { color:#5a4fcf; font-size:13px; margin-bottom:8px; text-align:center; }
+  .btn-green { background:linear-gradient(90deg,#38a169,#48bb78) !important; color:#fff; }
+  .btn-red { background:linear-gradient(90deg,#e53e3e,#f56565) !important; color:#fff; }
+  .btn-orange { background:linear-gradient(90deg,#dd6b20,#ed8936) !important; color:#fff; }
+  .btn-gray { background:#edf2f7 !important; color:#4a5568 !important; }
+
+  .gift-picker { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:16px 0; }
+  .gift-circle { width:74px; height:74px; border-radius:50%; background:linear-gradient(135deg,#ffffff,#f3eefe); border:2.5px solid #c3b2f0; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; }
+  .gift-circle span { font-size:26px; line-height:1; }
+
+  #imgModal { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px; }
+  #imgModal img { max-width:100%; max-height:90vh; border-radius:12px; object-fit:contain; }
+
+  #toast { position:fixed; bottom:95px; left:50%; transform:translateX(-50%); background:#2d3748; color:#fff; padding:9px 20px; border-radius:24px; font-size:13px; z-index:200; opacity:0; transition:.3s; pointer-events:none; }
+  #toast.show { opacity:1; }
+
+  #bottomBar { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; padding:10px 10px 14px; background:linear-gradient(180deg,rgba(255,255,255,.94),#f2efff); border-top:1px solid #e9e4fd; flex-shrink:0; box-shadow:0 -10px 28px rgba(90,79,207,.12); }
+  .b-btn { display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 2px; border-radius:18px; background:transparent; border:1.5px solid transparent; cursor:pointer; transition:.25s; position:relative; }
+  .b-btn .b-icon { font-size:21px; filter:grayscale(.35); transition:.25s; }
+  .b-btn .b-label { font-size:10.5px; font-weight:bold; color:#8b87a8; transition:.2s; }
+  .b-btn:hover { background:#f1edff; transform:translateY(-2px); }
+  .b-btn:hover .b-icon { transform:scale(1.18); filter:none; }
+  .b-btn.active { background:linear-gradient(135deg,#667eea,#9f7aea); border-color:#5a4fcf; box-shadow:0 10px 22px rgba(102,126,234,.45); transform:translateY(-4px); }
+  .b-btn.active .b-icon { filter:none; transform:scale(1.18); }
+  .b-btn.active .b-label { color:#fff; }
+  .nav-badge { position:absolute; top:3px; left:6px; background:#e53e3e; color:#fff; border-radius:50%; min-width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold; padding:0 3px; }
+
+  /* ===== تصميم صفحة الملف الشخصي الجديدة والمطابقة للصورة تماماً ===== */
+  #pageProfile {
+    background: #ede9fe !important;
+    overflow-y: auto;
+  }
+  .profile-hero {
+    background: linear-gradient(180deg, #3b0764 0%, #6b21a8 60%, #a855f7 100%) !important;
+    padding: 30px 16px 20px !important;
+    border-radius: 0 0 35px 35px !important;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(107, 33, 168, 0.25);
+  }
+  .avatar-ring {
+    width: 110px !important;
+    height: 110px !important;
+    margin: 0 auto 10px !important;
+    padding: 4px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    position: relative;
+    cursor: pointer;
+  }
+  .avatar-ring .profile-avatar-big {
+    width: 102px !important;
+    height: 102px !important;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .profile-hero .profile-name {
+    color: #ffffff !important;
+    font-size: 22px !important;
+    font-weight: bold;
+    margin-top: 4px;
+  }
+  .profile-hero .profile-id-tag {
+    color: rgba(255, 255, 255, 0.8) !important;
+    font-size: 13px !important;
+  }
+  .stats-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+    padding: 16px 14px 0 !important;
+  }
+  .stat-card {
+    background: #ffffff !important;
+    border-radius: 20px !important;
+    padding: 14px 6px !important;
+    text-align: center !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #f3e8ff !important;
+    cursor: pointer;
+  }
+  .stat-card .stat-icon { font-size: 26px !important; margin-bottom: 4px; }
+  .stat-card .s-val { font-size: 20px !important; font-weight: 800 !important; color: #4c1d95 !important; }
+  .stat-card .s-label { font-size: 11px !important; color: #6b7280 !important; margin-top: 4px; }
+
+  #pageProfile .profile-card {
+    background: #ffffff !important;
+    margin: 16px 14px 0 !important;
+    border-radius: 24px !important;
+    padding: 20px 16px !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid #f3e8ff !important;
+  }
+  #pageProfile .profile-card label {
+    color: #4c1d95 !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    display: block;
+    margin-bottom: 6px;
+    text-align: right;
+  }
+  #pageProfile .profile-card input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 14px !important;
+    border: 1.5px solid #e9d5ff !important;
+    background: #faf5ff !important;
+    color: #1e1b4b !important;
+    font-size: 14px;
+    margin-bottom: 14px;
+    outline: none;
+  }
+  #pageProfile .btn-green {
+    background: linear-gradient(90deg, #10b981, #059669) !important;
+    color: #ffffff !important;
+    border-radius: 14px !important;
+    padding: 13px !important;
+    font-size: 15px !important;
+    font-weight: bold;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
+    border: none;
+    width: 100%;
+    cursor: pointer;
+  }
+  .status-picker {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 8px;
+  }
+  .status-opt {
+    flex: 1;
+    padding: 11px 4px !important;
+    font-size: 13px !important;
+    font-weight: bold;
+    border-radius: 14px !important;
+    border: 1.5px solid #e9d5ff !important;
+    background: #ffffff !important;
+    color: #4c1d95 !important;
+    cursor: pointer;
+    transition: .2s;
+  }
+  .status-opt.active {
+    border-color: #8b5cf6 !important;
+    background: #f3e8ff !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2) !important;
+  }
+  #pageProfile .btn-red {
+    background: linear-gradient(90deg, #ef4444, #dc2626) !important;
+    color: #ffffff !important;
+    border-radius: 16px !important;
+    padding: 14px !important;
+    font-size: 15px !important;
+    font-weight: bold;
+    box-shadow: 0 6px 18px rgba(239, 68, 68, 0.25);
+    margin: 16px 14px 24px !important;
+    width: calc(100% - 28px) !important;
+    border: none;
+    cursor: pointer;
+  }
+  .level-badge { display:inline-block; background:linear-gradient(90deg,#f6e05e,#ed8936); color:#744210; font-size:12px; font-weight:bold; padding:4px 16px; border-radius:16px; box-shadow:0 3px 10px rgba(237,137,54,.4); }
+
+  /* ===== كروت صفحة الألعاب ===== */
+  .games-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:14px; }
+  .game-card { background:#fff; border:2px solid #ede9fe; border-radius:20px; padding:18px 10px; cursor:pointer; transition:.2s; box-shadow:0 6px 18px rgba(90,79,207,.08); }
+  .game-card:hover { transform:translateY(-4px); border-color:#9f7aea; box-shadow:0 12px 28px rgba(102,126,234,.25); }
+  .gc-icon { font-size:38px; margin-bottom:6px; }
+  .gc-name { font-size:15px; font-weight:bold; color:#2d3748; margin-bottom:4px; }
+  .gc-desc { font-size:11px; color:#718096; line-height:1.5; }
+  .gc-play { margin-top:10px; display:inline-block; background:linear-gradient(90deg,#667eea,#9f7aea); color:#fff; font-size:12px; font-weight:bold; padding:6px 18px; border-radius:14px; }
+  .game-card.soon { background:#fafafa; border-style:dashed; }
+  .game-card.soon .gc-icon { filter:grayscale(.5); opacity:.8; }
+  .gc-soon { margin-top:10px; display:inline-block; background:#e2e8f0; color:#718096; font-size:12px; font-weight:bold; padding:6px 18px; border-radius:14px; }
+  .ttt-cell.filled { cursor:default; }
+
+  /* ===== صفحة نظام المستويات ===== */
+  .levels-hero { background:linear-gradient(135deg,#0ea5e9,#6366f1); border-radius:22px; padding:20px 16px; color:#fff; text-align:center; margin-bottom:14px; box-shadow:0 10px 28px rgba(14,165,233,.3); }
+  .levels-hero .lh-level { font-size:28px; font-weight:bold; }
+  .levels-hero .lh-name { font-size:15px; font-weight:bold; margin:4px 0 10px; }
+  .levels-hero .lh-diamonds { font-size:13px; opacity:.95; margin-bottom:8px; }
+  .levels-list { display:flex; flex-direction:column; gap:8px; }
+  .level-row { display:flex; align-items:center; gap:12px; background:#fff; border:1.5px solid #e2e8f0; border-radius:16px; padding:12px 14px; }
+  .level-row .lr-num { width:38px; height:38px; border-radius:50%; background:#e2e8f0; color:#64748b; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; flex-shrink:0; }
+  .level-row .lr-info { flex:1; }
+  .level-row .lr-name { font-size:14px; font-weight:bold; color:#2d3748; }
+  .level-row .lr-req { font-size:11px; color:#94a3b8; }
+  .level-row.done { border-color:#86efac; background:#f0fdf4; }
+  .level-row.done .lr-num { background:#22c55e; color:#fff; }
+  .level-row.current { border-color:#0ea5e9; background:linear-gradient(135deg,#f0f9ff,#e0f2fe); box-shadow:0 6px 18px rgba(14,165,233,.25); }
+  .level-row.current .lr-num { background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; }
+  .level-row.locked { opacity:.65; }
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<div id="authScreen">
+  <div class="card">
+    <h1>🌟 دردشة النجوم</h1>
+    <p class="sub">✨ سجّل حسابك وابدأ التواصل والألعاب!</p>
+
+    <div class="tab-btns">
+      <button id="loginTabBtn" class="active" onclick="switchTab('login')">🔑 دخول</button>
+      <button id="registerTabBtn" onclick="switchTab('register')">📝 حساب جديد</button>
+    </div>
+
+    <img id="avatarPreview" class="avatar-preview hidden" alt="">
+    <label id="avatarLabel" class="hidden">🖼️ صورتك الشخصية:</label>
+    <div class="avatar-row hidden" id="avatarRow">
+      <input id="accAvatar" type="file" accept="image/*">
+    </div>
+
+    <label>🏷️ اسم المستخدم</label>
+    <input id="accName" placeholder="اسم الحساب..." maxlength="20">
+
+    <label>🔒 كلمة المرور</label>
+    <input id="accPass" type="password" placeholder="كلمة المرور" maxlength="30">
+
+    <div id="registerFields" class="hidden">
+      <label>🔒 تأكيد كلمة المرور</label>
+      <input id="accPassConfirm" type="password" placeholder="أعد كتابة كلمة المرور" maxlength="30">
+      <label>⚧ النوع</label>
+      <select id="accGender">
+        <option value="ذكر 👨">ذكر 👨</option>
+        <option value="أنثى 👩">أنثى 👩</option>
+      </select>
+      <label>🎂 العمر</label>
+      <input id="accAge" type="number" placeholder="مثال: 22" min="10" max="99">
+    </div>
+
+    <div id="authErr"></div>
+    <button id="authSubmitBtn" onclick="handleAuth()">دخول 🚀</button>
+  </div>
+</div>
+
+<div id="chatScreen" class="hidden">
+
+  <!-- صفحة المتصلين -->
+  <div id="pageChat" class="page">
+    <header>
+      <div>
+        <h2>🌟 دردشة النجوم</h2>
+        <div class="room" id="whoAmI"></div>
+      </div>
+      <div class="hbtns">
+        <button onclick="toggleGlobalAudio()" id="audioEnableBtn">🔊 تفعيل الصوت</button>
+        <button onclick="toggleSound()" id="soundBtn">🔔</button>
+        <button id="adminSecretBtn" class="hidden" onclick="openSecretAdminModal()" style="border-color:#f6e05e; background:rgba(246,224,94,.25);">🔐</button>
+      </div>
+    </header>
+
+    <div style="padding: 12px 16px; overflow-y: auto; flex: 1; background: #ffffff;">
+      <div class="side-panel">
+        <b>🏆 الصدارة</b>
+        <div id="topWinnerCard" class="hidden">
+          <div class="title">👑 ملك النجوم</div>
+          <div class="name" id="top1Name">---</div>
+          <div class="pts"><span id="top1Pts">0</span> عملة</div>
+        </div>
+        <div id="leaderboardList"></div>
+      </div>
+
+      <div id="onlineUsersList"></div>
+    </div>
+  </div>
+
+  <!-- صفحة الغرف الصوتية -->
+  <div id="pageRooms" class="page hidden">
+    <header>
+      <div>
+        <h2>🎙️ غرف الدردشة الصوتية المباشرة</h2>
+        <div class="room">اختر غرفة وانضم للمقاعد الصوتية</div>
+      </div>
+      <div class="hbtns">
+        <button onclick="toggleGlobalAudio()" id="audioEnableBtn2">🔊 تفعيل الصوت</button>
+      </div>
+    </header>
+    <div style="padding:16px; overflow-y:auto; flex:1; background:#f8f7ff;">
+      <div class="room-card-box" onclick="openEgyptRoom()">
+        <h3>🇪🇬 غرفة مصر الصوتية</h3>
+        <p>انقر للدخول إلى الروم والمشاركة بالمايك المباشر (6 مقاعد صوتية متاحة)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- صفحة روم مصر -->
+  <div id="pageEgyptRoom" class="page hidden">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:linear-gradient(90deg,#be185d,#ec4899); color:#fff; flex-shrink:0;">
+      <button onclick="showPage('pageRooms')" style="width:auto; padding:6px 12px; font-size:12px; background:rgba(255,255,255,.2); border:none; border-radius:8px; color:#fff; cursor:pointer;">→ رجوع</button>
+      <span style="font-weight:bold;">🎙️ روم مصر - المقاعد الصوتية</span>
+      <button onclick="leaveEgyptSeat()" style="width:auto; padding:6px 12px; font-size:12px; background:#ef4444; border:none; border-radius:8px; color:#fff; cursor:pointer;">مغادرة المقعد 🚪</button>
+    </div>
+    <div style="padding:20px; text-align:center; overflow-y:auto; flex:1; background:#ffffff;">
+      <div style="font-size:13px; color:#6b7280; margin-bottom:10px;">اضغط على أي مقعد فارغ للانتقال إليه فوراً:</div>
+
+      <div class="voice-seats-grid" id="egyptSeatsContainer">
+        <div class="voice-seat" id="seat_0" onclick="takeSeat(0)"><div class="seat-fallback">🎤</div><span class="name-label">مقعد 1</span></div>
+        <div class="voice-seat" id="seat_1" onclick="takeSeat(1)"><div class="seat-fallback">🎤</div><span class="name-label">مقعد 2</span></div>
+        <div class="voice-seat" id="seat_2" onclick="takeSeat(2)"><div class="seat-fallback">🎤</div><span class="name-label">مقعد 3</span></div>
+        <div class="voice-seat" id="seat_3" onclick="takeSeat(3)"><div class="seat-fallback">🎤</div><span class="name-label">مقعد 4</span></div>
+        <div class="voice-seat" id="seat_4" onclick="takeSeat(4)"><div class="seat-fallback">🎤</div><span class="name-label">مقعد 5</span></div>
+        <div class="voice-seat" id="seat_5" onclick="takeSeat(5)"><div class="seat-fallback">🎤</div><span class="name-label">مقعد 6</span></div>
+      </div>
+
+      <div class="mic-controls-bar">
+        <button id="micMuteBtn" class="mic-ctrl-btn mute hidden" onclick="toggleEgyptMicMute()">🔇 قفل المايك</button>
+        <button id="micUnmuteBtn" class="mic-ctrl-btn unmute hidden" onclick="toggleEgyptMicUnmute()">🎙️ فتح المايك</button>
+      </div>
+
+      <div id="micStatusBox" style="margin-top:15px; font-weight:bold; color:#be185d; font-size:14px;"></div>
+    </div>
+  </div>
+
+  <!-- صفحة الملف الشخصي للمستخدم الآخر -->
+  <div id="pageUserProfile" class="page hidden">
+    <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:linear-gradient(90deg,#5a4fcf,#9f7aea); color:#fff; flex-shrink:0;">
+      <button onclick="showPage('pageChat')" style="width:auto; padding:6px 12px; font-size:12px; background:rgba(255,255,255,.2); border:none; border-radius:8px; color:#fff; cursor:pointer;">→ رجوع</button>
+      <span style="font-weight:bold;">ملف المستخدم</span>
+    </div>
+    <div style="padding:20px; text-align:center; overflow-y:auto; flex:1; background:#ffffff;">
+      <div id="upAvatarBox" style="margin-bottom:12px;"></div>
+      <h2 id="upName" style="font-size:22px; font-weight:bold; color:#2d3748; margin-bottom:2px;">---</h2>
+      <div id="upIdTag" style="font-size:12px; color:#718096; margin-bottom:8px;">ID: ---</div>
+      <div id="upBio" style="font-size:13px; color:#5a4fcf; font-weight:bold; margin-bottom:12px;">---</div>
+      <div id="upDetails" style="color:#718096; font-size:14px; margin-bottom:20px;">---</div>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button id="upFollowBtn" class="follow-btn" style="padding:10px 20px; font-size:14px;" onclick="toggleFollowTarget()">➕ متابعة</button>
+        <button id="upChatBtn" class="hi-btn" style="padding:10px 20px; font-size:14px; justify-content:center;">💬 محادثة</button>
+        <button id="upMuteBtn" class="dm-act-btn btn-orange" style="padding:10px 20px; font-size:14px;" onclick="toggleMuteTarget()">🔇 كتم المستخدم</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- صفحة الرسائل -->
+  <div id="pageDMs" class="page hidden">
+    <div id="dmListView" class="dm-page-scroll">
+      <div class="page-header-row">
+        <div class="page-title">📩 الرسائل</div>
+      </div>
+
+      <div class="search-id-bar">
+        <input id="searchIdInput" placeholder="🔍 ابحث برقم الـ ID أو اسم الحساب..." onkeydown="if(event.key==='Enter')searchUserById()">
+        <button onclick="searchUserById()">بحث</button>
+      </div>
+
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setDmFilter('all', this)">الجميع</button>
+        <button class="filter-tab" onclick="setDmFilter('online', this)">متصل</button>
+        <button class="filter-tab" onclick="setDmFilter('unread', this)">غير مقروء</button>
+        <button class="filter-tab" onclick="setDmFilter('friends', this)">الأصدقاء (متابعة متبادلة)</button>
+      </div>
+
+      <div class="section-label" style="font-size:13px; font-weight:bold; color:#6b46c1; margin:10px 0 6px;">💬 المحادثات</div>
+      <div id="dmConversationsList"></div>
+    </div>
+
+    <div id="dmConvView" class="hidden">
+      <div id="dmConvHeader">
+        <button id="dmBackBtn" onclick="closeDmConv()">→ رجوع</button>
+        <span id="dmConvTitle">📩 محادثة</span>
+      </div>
+      <input type="file" id="dmImgInput" accept="image/*" class="hidden" onchange="sendDmImage(this)">
+      <div id="dmMsgs"></div>
+      <div id="dmTypingBar"></div>
+      <div id="dmEmojiPanel" class="hidden"></div>
+      <div id="dmInputBar">
+        <input id="dmInput" placeholder="✍️ اكتب رسالة..." oninput="dmTypingNotify()" onkeydown="if(event.key==='Enter')sendDm()">
+        <button id="dmVoiceBtn" onclick="toggleVoiceRecord()" title="🎤 تسجيل صوتي">🎤</button>
+        <button id="dmEmojiBtn" onclick="toggleDmEmoji()" title="😊">😊</button>
+        <button id="dmSendBtn" onclick="sendDm()">📩</button>
+      </div>
+      <div id="dmActionsBar">
+        <button class="dm-act-btn" style="background:linear-gradient(135deg,#667eea,#9f7aea);" onclick="openGiftModal()">🎁 هدية (5 عملات)</button>
+        <button class="dm-act-btn" style="background:linear-gradient(135deg,#63b3ed,#4299e1);" onclick="document.getElementById('dmImgInput').click()">🖼️ صورة</button>
+        <button id="buyBtnAction" class="dm-act-btn btn-orange hidden" onclick="openBuyModal()">💎 شحن</button>
+        <button id="withdrawBtnAction" class="dm-act-btn btn-green hidden" onclick="openWithdrawModal()">💸 سحب</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- صفحة الألعاب -->
+  <div id="pageGame" class="page hidden">
+    <div id="gameLobby" class="dm-page-scroll" style="text-align:center;">
+      <div class="game-hero">
+        <div class="g-icon">🎮</div>
+        <h3>ساحة الألعاب</h3>
+        <p>تحدَّ أصدقاءك برهان حقيقي 🪙 — حط رهانك واكسب من خصمك! 🏆</p>
+      </div>
+
+      <div style="background:#fff; border:2px solid #ede9fe; border-radius:18px; padding:14px; margin-top:14px; text-align:right;">
+        <label style="margin-bottom:4px;">🪙 مبلغ الرهان لكل لاعب:</label>
+        <input id="tttStakeInput" type="number" value="5" min="1" max="500" style="text-align:center; font-weight:bold; color:#5a4fcf;">
+        <div style="font-size:11px; color:#718096; margin-top:6px;">⚔️ الفائز يكسب مجموع الرهانين ناقص عمولة 2 عملة للتطبيق — لو تعادلتوا ترجع فلوسكوا 💰 ولو رفض الخصم أو ما ردش خلال دقيقة بترجعلك فلوسك تلقائياً.</div>
+      </div>
+
+      <div class="games-grid">
+        <div class="game-card" onclick="showGamePicker()">
+          <div class="gc-icon">❌⭕</div>
+          <div class="gc-name">تحدي إكس أو</div>
+          <div class="gc-desc">رهان مباشر بينك وبين خصمك 🪙<br>اللي يكسب ياخد الرهانين — واللي يخسر يخسر كل حاجة</div>
+          <div class="gc-play">العب الآن 🚀</div>
+        </div>
+        <div class="game-card soon" onclick="playSoon('🎲 النرد الذهبي')">
+          <div class="gc-icon">🎲</div>
+          <div class="gc-name">النرد الذهبي</div>
+          <div class="gc-desc">تحدي الحظ والأرقام</div>
+          <div class="gc-soon">🔒 قريباً</div>
+        </div>
+        <div class="game-card soon" onclick="playSoon('🃏 أحزر الرقم')">
+          <div class="gc-icon">🃏</div>
+          <div class="gc-name">أحزر الرقم</div>
+          <div class="gc-desc">خمّن الرقم السري مع أصدقائك</div>
+          <div class="gc-soon">🔒 قريباً</div>
+        </div>
+        <div class="game-card soon" onclick="playSoon('🏓 بينج بونج')">
+          <div class="gc-icon">🏓</div>
+          <div class="gc-name">بينج بونج</div>
+          <div class="gc-desc">لعبة السرعة والتركيز</div>
+          <div class="gc-soon">🔒 قريباً</div>
+        </div>
+      </div>
+
+      <div id="gameWaitNote" style="font-size:13px; font-weight:bold; color:#6b46c1; margin-top:14px; min-height:18px;"></div>
+
+      <div id="gameUserPicker" class="hidden">
+        <div style="font-size:13px; font-weight:bold; color:#6b46c1; margin:14px 0 6px; text-align:right;">🟢 اختر خصمك في إكس أو:</div>
+        <div id="gameUserList"></div>
+      </div>
+    </div>
+
+    <div id="gameBoardView" class="hidden">
+      <div id="gameStatusBig">في انتظار المنافس...</div>
+      <div id="tttBoard">
+        <div class="ttt-cell" onclick="playTTT(0)"></div><div class="ttt-cell" onclick="playTTT(1)"></div><div class="ttt-cell" onclick="playTTT(2)"></div>
+        <div class="ttt-cell" onclick="playTTT(3)"></div><div class="ttt-cell" onclick="playTTT(4)"></div><div class="ttt-cell" onclick="playTTT(5)"></div>
+        <div class="ttt-cell" onclick="playTTT(6)"></div><div class="ttt-cell" onclick="playTTT(7)"></div><div class="ttt-cell" onclick="playTTT(8)"></div>
+      </div>
+      <button class="btn-red" onclick="exitGameBtn()" style="max-width:340px; margin:14px auto 0;">🚪 الخروج (انسحاب = خسارة)</button>
+    </div>
+  </div>
+
+  <!-- صفحة الملف الشخصي المحدثة بالكامل والمطابقة للصورة -->
+  <div id="pageProfile" class="page hidden">
+    <div class="profile-hero">
+      <div class="profile-top">
+        <div class="avatar-ring" onclick="document.getElementById('profAvatarInput').click()">
+          <img id="profAvatarImg" class="profile-avatar-big hidden" alt="">
+          <div id="profAvatarFb" class="profile-avatar-big avatar-fallback" style="display:flex; align-items:center; justify-content:center; font-size:40px;">👤</div>
+        </div>
+        <div class="profile-name" id="profName">---</div>
+        <div class="profile-id-tag" id="profIdTag">ID: ---</div>
+        <div class="profile-badges" style="margin-top:6px;">
+          <span class="profile-role" id="profRole" style="background:rgba(255,255,255,0.2); color:#fff; padding:3px 12px; border-radius:12px; font-size:12px;">مستخدم ⭐</span>
+          <span class="level-badge hidden" id="profLevelBadge" style="margin-right:6px;">المستوى 1</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card" onclick="openBuyModal()">
+        <div class="stat-icon">🪙</div>
+        <div class="s-val" id="profPoints">0</div>
+        <div class="s-label">رصيد العملات</div>
+      </div>
+      <div class="stat-card diamond">
+        <div class="stat-icon">💎</div>
+        <div class="s-val" id="profDiamonds">0</div>
+        <div class="s-label">الماس المجموع</div>
+      </div>
+      <div class="stat-card level" onclick="openLevelPage()">
+        <div class="stat-icon">🏆</div>
+        <div class="s-val" id="profLevelNum">—</div>
+        <div class="s-label">المستوى</div>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <h4 class="card-title" style="color:#4c1d95; font-size:15px; margin-bottom:12px; text-align:right;">✏️ تعديل بياناتي الشخصية</h4>
+      
+      <label>🎂 تعديل العمر</label>
+      <input id="editAgeInput" type="number" min="10" max="99" placeholder="25">
+
+      <label>✍️ تعديل الحالة (Bio)</label>
+      <input id="editBioInput" maxlength="50" placeholder="حالتك الشخصية...">
+
+      <button class="btn-green" onclick="updateMyProfileDetails()">حفظ التعديلات ✅</button>
+
+      <h4 class="card-title" style="color:#4c1d95; font-size:14px; margin-top:18px; margin-bottom:10px; text-align:right;">🟢 حالتي الآن</h4>
+      <div class="status-picker">
+        <button class="status-opt" id="status_online" onclick="setMyStatus('online')">🟢 متاح</button>
+        <button class="status-opt" id="status_busy" onclick="setMyStatus('busy')">🔴 مشغول</button>
+        <button class="status-opt" id="status_away" onclick="setMyStatus('away')">🟡 بعيد</button>
+      </div>
+
+      <input id="profAvatarInput" type="file" accept="image/*" class="hidden" onchange="changeMyAvatar()">
+    </div>
+
+    <button class="btn-red" onclick="leave()">🚪 تسجيل الخروج</button>
+  </div>
+
+  <!-- لوحة التحكم المخفية -->
+  <div id="adminOverlay" class="modal-overlay hidden">
+    <div class="modal-window">
+      <h3 style="color:#5a4fcf;">🔐 لوحة الإدارة والمشرفين</h3>
+      <p id="adminRoleLabel" style="font-size:12px; color:#718096; margin-bottom:10px;"></p>
+
+      <div class="admin-section">
+        <h4>🔑 تغيير كلمة مرور مستخدم فوراً</h4>
+        <input id="adminPassTarget" placeholder="اسم الحساب..." style="text-align:center;">
+        <input id="adminNewPass" placeholder="كلمة المرور الجديدة" style="text-align:center;">
+        <button class="btn-orange" onclick="adminChangePassword()">تغيير كلمة المرور 🔒</button>
+      </div>
+
+      <div class="admin-section">
+        <h4>🛡️ تعيين مساعد أدمن (Mod)</h4>
+        <input id="adminModTarget" placeholder="اسم الحساب..." style="text-align:center;">
+        <button class="btn-green" onclick="adminToggleMod()">منح/سحب صلاحية مساعد ✅</button>
+      </div>
+
+      <div class="admin-section">
+        <h4>🎁 شحن عملات</h4>
+        <input id="adminTargetUser" placeholder="اسم الحساب..." style="text-align:center;">
+        <input id="adminPointsAmount" type="number" value="50" style="text-align:center;">
+        <button class="btn-green" onclick="adminGrantPoints()">شحن العملات 🪙</button>
+      </div>
+
+      <div class="admin-section">
+        <h4>🔇 كتم / فك الكتم</h4>
+        <input id="adminMuteTarget" placeholder="اسم الحساب..." style="text-align:center;">
+        <input id="adminMuteMins" type="number" value="10" placeholder="دقائق الكتم" style="text-align:center;">
+        <button class="btn-orange" onclick="adminMute()">تنفيذ 🔇</button>
+      </div>
+
+      <div class="admin-section" style="max-height:140px; overflow-y:auto;" id="allCloudUsersList">
+        <h4>📋 الحسابات المسجلة</h4>
+      </div>
+
+      <button class="btn-red" onclick="closeSecretAdminModal()" style="margin-top:8px;">إغلاق ✖</button>
+    </div>
+  </div>
+
+  <div id="buyOverlay" class="modal-overlay hidden">
+    <div class="modal-window">
+      <h3>💎 طلب شحن عملات</h3>
+      <p style="font-size:12px; color:#718096; margin:8px 0;">كل 50 عملة = 1 دولار 💵</p>
+      <input id="reqPointsInput" type="number" value="50" oninput="calcPrice()" style="text-align:center;">
+      <div style="background:#faf9ff; border:1.5px solid #ede9fe; padding:10px; border-radius:12px; margin-bottom:12px;">
+        المبلغ: <b id="calcPriceUsd" style="color:#6b46c1;">$1.00</b>
+      </div>
+      <button class="btn-green" onclick="confirmBuyRequest()">إرسال الطلب ✅</button>
+      <button class="btn-gray" onclick="closeBuyModal()" style="margin-top:8px;">إغلاق</button>
+    </div>
+  </div>
+
+  <div id="withdrawOverlay" class="modal-overlay hidden">
+    <div class="modal-window">
+      <h3>💸 طلب سحب الأرباح</h3>
+      <p style="font-size:12px; color:#718096; margin:8px 0;">اطلب سحب أرباحك المكسبة من المحادثات</p>
+      <input id="reqWithdrawInput" type="number" value="50" style="text-align:center;">
+      <button class="btn-green" onclick="confirmWithdrawRequest()">إرسال طلب السحب ✅</button>
+      <button class="btn-gray" onclick="closeWithdrawModal()" style="margin-top:8px;">إغلاق</button>
+    </div>
+  </div>
+
+  <div id="giftOverlay" class="modal-overlay hidden">
+    <div class="modal-window">
+      <h3>🎁 اختار هديتك</h3>
+      <p style="font-size:12px; color:#718096;">كل هدية = <b style="color:#6b46c1;">5 عملات 🪙</b></p>
+      <div class="gift-picker">
+        <div class="gift-circle" onclick="selectGift(0)"><span>🌹</span><small>وردة</small></div>
+        <div class="gift-circle" onclick="selectGift(1)"><span>🪙</span><small>عملة</small></div>
+        <div class="gift-circle" onclick="selectGift(2)"><span>🎁</span><small>هدية</small></div>
+        <div class="gift-circle" onclick="selectGift(3)"><span>⚡</span><small>صاعقة</small></div>
+        <div class="gift-circle" onclick="selectGift(4)"><span>🏆</span><small>كأس</small></div>
+      </div>
+      <button class="btn-green" onclick="confirmGift()">إرسال الهدية 🎁</button>
+      <button class="btn-gray" onclick="closeGiftModal()" style="margin-top:8px;">إلغاء ✖</button>
+    </div>
+  </div>
+
+  <div id="imgModal" class="hidden" onclick="this.classList.add('hidden')">
+    <img id="modalFullImg" src="">
+  </div>
+
+  <!-- صفحة نظام مستويات الماس -->
+  <div id="pageLevels" class="page hidden">
+    <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:linear-gradient(90deg,#0369a1,#0ea5e9); color:#fff; flex-shrink:0;">
+      <button onclick="showPage('pageProfile')" style="width:auto; padding:6px 12px; font-size:12px; background:rgba(255,255,255,.2); border:none; border-radius:8px; color:#fff; cursor:pointer;">→ رجوع</button>
+      <span style="font-weight:bold;">💎 نظام مستويات الماس</span>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding:16px; background:#f0f9ff;">
+      <div class="levels-hero" id="levelsHero"></div>
+      <div class="levels-list" id="levelsList"></div>
+      <p style="font-size:11px; color:#64748b; text-align:center; margin-top:12px;">💡 اجمعي الماس من الهدايا 🎁 ورسائل المعجبين — كلما زاد ماسكِ ارتفع مستواكِ!</p>
+    </div>
+  </div>
+
+  <!-- الأزرار السفلية الخمسة ثابتة -->
+  <div id="bottomBar">
+    <button class="b-btn active" data-page="pageChat" onclick="showPage('pageChat')"><span class="b-icon">🟢</span><span class="b-label">المتصلون</span></button>
+    <button class="b-btn" data-page="pageRooms" onclick="showPage('pageRooms')"><span class="b-icon">🎙️</span><span class="b-label">غرفة</span></button>
+    <button class="b-btn" data-page="pageDMs" onclick="showPage('pageDMs')"><span class="b-icon">📩</span><span class="b-label">الرسائل</span><span id="dmNavBadge" class="nav-badge hidden">0</span></button>
+    <button class="b-btn" data-page="pageGame" onclick="showPage('pageGame')"><span class="b-icon">🎮</span><span class="b-label">الألعاب</span></button>
+    <button class="b-btn" data-page="pageProfile" onclick="showPage('pageProfile')"><span class="b-icon">👤</span><span class="b-label">ملفي</span></button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const BROKER = 'wss://broker.emqx.io:8084/mqtt';
+let client, myName, roomTopic = 'dardashti_stars_app_2026_v25';
+let mySessionId = "sess_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now();
+
+let cloudAccounts = JSON.parse(localStorage.getItem('cloud_accounts_sync_v25') || '{}');
+let onlineUsers = {};
+
+if(!cloudAccounts['sasa']){
+  cloudAccounts['sasa'] = { pass: 'mosa', points: 1000, gender: 'ذكر 👨', age: 25, bio: 'مؤسس التطبيق 🌟', idNum: '99999999', isAdmin: true, isMod: false, avatar: '', mutedUntil: 0, isBanned: false, diamonds: 0, following: [], mutes: [] };
+}
+
+let currentTab = 'login';
+const GIFT_COST = 5;
+const TTT_COMMISSION = 2;
+const GIFTS = [{e:'🌹', n:'وردة'}, {e:'🪙', n:'عملة'}, {e:'🎁', n:'هدية مفاجئة'}, {e:'⚡', n:'صاعقة نجمية'}, {e:'🏆', n:'كأس النجوم'}];
+let myPoints = 50;
+const ADMIN_NAME = 'sasa';
+
+let dmWith = null;
+let dmHistory = JSON.parse(localStorage.getItem('dm_history_v25') || '{}');
+let unreadDm = {};
+let currentDmFilter = 'all';
+
+let registerAvatarData = '';
+let typingTimers = {};
+
+let audioCtx = null;
+let soundOn = localStorage.getItem('sound_on_v25') !== '0';
+
+let egyptSeats = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null };
+let myCurrentSeat = null;
+let voiceStream = null;
+let isMicMuted = false;
+
+document.addEventListener('click', () => {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e){}
+});
+
+function toggleGlobalAudio(){
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    document.querySelectorAll('#audioEnableBtn, #audioEnableBtn2').forEach(b => b.textContent = '🔊 الصوت مفعل');
+    toast('✅ تم تفعيل الصوت في المتصفح بنجاح');
+  } catch(e) {
+    toast('❌ فشل في تفعيل الصوت');
+  }
+}
+
+function updateSoundBtn(){ document.getElementById('soundBtn').textContent = soundOn ? '🔔' : '🔕'; }
+function toggleSound(){
+  soundOn = !soundOn;
+  localStorage.setItem('sound_on_v25', soundOn ? '1' : '0');
+  updateSoundBtn();
+  toast(soundOn ? '🔊 الصوت شغال' : '🔇 الصوت مغلق');
+}
+function beep(freq, dur, delay){
+  if(!soundOn) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime + (delay || 0);
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }catch(e){}
+}
+function dmSound(){ beep(880, .12, 0); beep(1174, .16, .13); }
+function esc(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+initGlobalConnect();
+
+function showPage(pageId){
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById(pageId).classList.remove('hidden');
+  document.querySelectorAll('.b-btn').forEach(b => b.classList.toggle('active', b.dataset.page === pageId));
+
+  if(pageId === 'pageDMs') renderDmListView();
+  if(pageId === 'pageProfile') renderProfilePage();
+  if(pageId === 'pageGame') renderGameUserList();
+  if(pageId === 'pageEgyptRoom') renderEgyptSeatsUI();
+}
+
+document.getElementById('accAvatar').addEventListener('change', function(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  if(f.size > 300 * 1024){ toast('⚠️ الصورة كبيرة! اختر أقل من 300KB'); return; }
+  const r = new FileReader();
+  r.onload = ev => {
+    registerAvatarData = ev.target.result;
+    const pv = document.getElementById('avatarPreview');
+    pv.src = registerAvatarData; pv.classList.remove('hidden');
+  };
+  r.readAsDataURL(f);
+});
+
+function toast(t){
+  const el = document.getElementById('toast');
+  el.textContent = t; el.classList.add('show');
+  setTimeout(()=> el.classList.remove('show'), 3000);
+}
+
+function switchTab(tab){
+  currentTab = tab;
+  document.getElementById('loginTabBtn').classList.toggle('active', tab === 'login');
+  document.getElementById('registerTabBtn').classList.toggle('active', tab === 'register');
+  document.getElementById('registerFields').classList.toggle('hidden', tab === 'login');
+  document.getElementById('avatarLabel').classList.toggle('hidden', tab === 'login');
+  document.getElementById('avatarRow').classList.toggle('hidden', tab === 'login');
+  document.getElementById('authSubmitBtn').textContent = tab === 'login' ? 'دخول 🚀' : 'إنشاء الحساب ✨';
+  document.getElementById('authErr').textContent = '';
+}
+
+function getRole(u){ if(!u) return 'user'; if(u.isAdmin) return 'admin'; if(u.isMod) return 'mod'; return 'user'; }
+function myRole(){ return getRole(cloudAccounts[myName]); }
+function isStaff(name){ const acc = cloudAccounts[name]; return acc && (acc.isAdmin || acc.isMod); }
+function isMutedNow(name){ const u = cloudAccounts[name]; return !!(u && (u.mutedUntil || 0) > Date.now()); }
+function isFemale(name){ const acc = cloudAccounts[name]; return acc && acc.gender && acc.gender.includes('أنثى'); }
+function isMutualFriends(userA, userB){
+  const accA = cloudAccounts[userA];
+  const accB = cloudAccounts[userB];
+  const followingA = accA && Array.isArray(accA.following) && accA.following.includes(userB);
+  const followingB = accB && Array.isArray(accB.following) && accB.following.includes(userA);
+  return followingA && followingB;
+}
+
+function avatarHtml(u, isOnline, cls){
+  const imgContent = (u && u.avatar) ? `<img class="${cls || 'avatar'}" src="${u.avatar}">` : `<span class="${cls || 'avatar'} avatar-fallback">👤</span>`;
+  const dotClass = isOnline ? 'status-dot online' : 'status-dot';
+  return `<div class="avatar-container">${imgContent}<span class="${dotClass}"></span></div>`;
+}
+
+function initGlobalConnect(){
+  client = mqtt.connect(BROKER);
+  client.on('connect', ()=>{
+    ['game','users','sync_account','admin_points','request_db','session_kick','dm','gift','control','typing','dm_sync','egypt_voice'].forEach(s => client.subscribe(roomTopic + '/' + s));
+    publish('request_db', { req: true });
+    setTimeout(()=> publish('egypt_voice', { type: 'get_seats' }), 1000);
+  });
+
+  client.on('message', (t, payload)=>{
+    const d = JSON.parse(payload.toString());
+    if(t.endsWith('/session_kick')){
+      if(d.username === myName && (d.sessionId !== mySessionId || d.force)){
+        alert(d.adminKick ? '👢 تم طردك!' : '⚠️ تم فتح حسابك من جهاز آخر!');
+        location.reload();
+      }
+    }
+    else if(t.endsWith('/sync_account')){
+      if(d.db){ cloudAccounts = { ...cloudAccounts, ...d.db }; }
+      else if(d.name && d.user){ cloudAccounts[d.name] = d.user; }
+      saveAndSyncAccounts();
+    }
+    else if(t.endsWith('/request_db')){ publish('sync_account', { db: cloudAccounts }); }
+    else if(t.endsWith('/dm_sync')) handleDmSync(d);
+    else if(t.endsWith('/game')) handleGameEvents(d);
+    else if(t.endsWith('/users')) handleUsersList(d);
+    else if(t.endsWith('/dm')) handleDm(d);
+    else if(t.endsWith('/gift')) handleGift(d);
+    else if(t.endsWith('/control')) handleControl(d);
+    else if(t.endsWith('/typing')) handleTyping(d);
+    else if(t.endsWith('/egypt_voice')) handleEgyptVoice(d);
+    else if(t.endsWith('/admin_points')){
+      if(cloudAccounts[d.target]){ cloudAccounts[d.target].points = d.newPts; saveAndSyncAccounts(); }
+      if(d.target === myName){
+        myPoints = d.newPts; renderPoints();
+        toast(`🎁 وصلتك ${d.amount} عملة من الإدارة!`);
+      }
+    }
+  });
+}
+
+function openEgyptRoom(){
+  showPage('pageEgyptRoom');
+  publish('egypt_voice', { type: 'get_seats' });
+}
+
+function takeSeat(seatIdx){
+  if(egyptSeats[seatIdx] && egyptSeats[seatIdx] !== myName){
+    toast('⚠️ هذا المقعد محجوز لشخص آخر!');
+    return;
+  }
+  if(myCurrentSeat === seatIdx) return;
+
+  if(myCurrentSeat !== null){
+    const oldSeat = myCurrentSeat;
+    egyptSeats[oldSeat] = null;
+    publish('egypt_voice', { type: 'leave_seat', seat: oldSeat, name: myName });
+  }
+
+  const activateSeatAndStream = () => {
+    myCurrentSeat = seatIdx;
+    egyptSeats[seatIdx] = myName;
+    publish('egypt_voice', { type: 'take_seat', seat: seatIdx, name: myName });
+    renderEgyptSeatsUI();
+    micJoinSound();
+    toast('🎙️ انتقلت إلى المقعد ' + (seatIdx + 1));
+    document.getElementById('micStatusBox').textContent = '🟢 المايك يعمل الآن';
+    document.getElementById('micMuteBtn').classList.remove('hidden');
+    document.getElementById('micUnmuteBtn').classList.add('hidden');
+  };
+
+  if(!voiceStream){
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      voiceStream = stream;
+      isMicMuted = false;
+      activateSeatAndStream();
+      startSeatBroadcast();
+    }).catch(err => {
+      toast('❌ تعذر الوصول إلى الميكروفون (يتطلب HTTPS وإذن الميكروفون)');
+    });
+  } else {
+    activateSeatAndStream();
+  }
+}
+
+function startSeatBroadcast(){
+  if(!voiceStream) return;
+  const recordCycle = () => {
+    if(myCurrentSeat === null || !voiceStream) return;
+    let rec;
+    try {
+      rec = new MediaRecorder(voiceStream);
+    } catch(e) {
+      return;
+    }
+    rec.ondataavailable = e => {
+      if(e.data.size > 0 && !isMicMuted && myCurrentSeat !== null && client && client.connected){
+        const reader = new FileReader();
+        reader.onload = ev => {
+          publish('egypt_voice', { type: 'audio_chunk', name: myName, seat: myCurrentSeat, audio: ev.target.result });
+        };
+        reader.readAsDataURL(e.data);
+      }
+    };
+    rec.onstop = () => {
+      if(myCurrentSeat !== null && voiceStream) setTimeout(recordCycle, 30);
+    };
+    rec.start();
+    setTimeout(() => { try{ rec.stop(); }catch(e){} }, 400);
+  };
+  recordCycle();
+}
+
+function micJoinSound(){
+  beep(523, .12, 0); beep(659, .12, .12); beep(784, .22, .24);
+  if(!soundOn) toast('🔔 نغمة المايك صامتة — شغّل الصوت من زر 🔔 أعلى الصفحة');
+}
+
+function toggleEgyptMicMute(){
+  if(myCurrentSeat === null) return;
+  isMicMuted = true;
+  if(voiceStream){
+    voiceStream.getAudioTracks().forEach(track => track.enabled = false);
+  }
+  document.getElementById('micMuteBtn').classList.add('hidden');
+  document.getElementById('micUnmuteBtn').classList.remove('hidden');
+  document.getElementById('micStatusBox').textContent = '🔴 المايك مقفل الآن';
+  toast('🔇 تم قفل المايك');
+}
+
+function toggleEgyptMicUnmute(){
+  if(myCurrentSeat === null) return;
+  isMicMuted = false;
+  if(voiceStream){
+    voiceStream.getAudioTracks().forEach(track => track.enabled = true);
+  }
+  document.getElementById('micMuteBtn').classList.remove('hidden');
+  document.getElementById('micUnmuteBtn').classList.add('hidden');
+  document.getElementById('micStatusBox').textContent = '🟢 المايك مفتوح الآن';
+  toast('🎙️ تم فتح المايك');
+}
+
+function leaveEgyptSeat(){
+  if(myCurrentSeat === null) return;
+  const s = myCurrentSeat;
+  myCurrentSeat = null;
+  isMicMuted = false;
+  egyptSeats[s] = null;
+  if(voiceStream){
+    voiceStream.getTracks().forEach(t => t.stop());
+    voiceStream = null;
+  }
+  publish('egypt_voice', { type: 'leave_seat', seat: s, name: myName });
+  renderEgyptSeatsUI();
+  document.getElementById('micStatusBox').textContent = '';
+  document.getElementById('micMuteBtn').classList.add('hidden');
+  document.getElementById('micUnmuteBtn').classList.add('hidden');
+  toast('🚪 مغادرة المقعد الصوتي');
+}
+
+function renderEgyptSeatsUI(){
+  for(let i=0; i<6; i++){
+    const seatEl = document.getElementById('seat_' + i);
+    if(!seatEl) continue;
+    const occupant = egyptSeats[i];
+    if(occupant){
+      seatEl.className = 'voice-seat occupied' + (occupant === myName ? ' speaking' : '');
+      const u = cloudAccounts[occupant] || {};
+      const imgHtml = u.avatar ? `<img src="${u.avatar}">` : `<div class="seat-fallback" style="background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px;">👤</div>`;
+      seatEl.innerHTML = `${imgHtml}<span class="name-label">${esc(occupant)}</span>`;
+    } else {
+      seatEl.className = 'voice-seat';
+      seatEl.innerHTML = `<div class="seat-fallback" style="display:flex; align-items:center; justify-content:center; font-size:22px;">🎤</div><span class="name-label">مقعد ${i+1}</span>`;
+    }
+  }
+}
+
+function handleEgyptVoice(d){
+  if(d.type === 'get_seats'){
+    publish('egypt_voice', { type: 'sync_seats', seats: egyptSeats });
+  } else if(d.type === 'sync_seats'){
+    if(d.seats) {
+      egyptSeats = d.seats;
+      renderEgyptSeatsUI();
+    }
+  } else if(d.type === 'take_seat'){
+    egyptSeats[d.seat] = d.name;
+    renderEgyptSeatsUI();
+    if(d.name !== myName) beep(1046, .15, 0);
+  } else if(d.type === 'leave_seat'){
+    if(egyptSeats[d.seat] === d.name) egyptSeats[d.seat] = null;
+    renderEgyptSeatsUI();
+  } else if(d.type === 'audio_chunk' && d.name !== myName){
+    playRemoteVoiceChunk(d.audio);
+  }
+}
+
+function playRemoteVoiceChunk(base64Data){
+  try {
+    if(document.getElementById('pageEgyptRoom').classList.contains('hidden')) return;
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); return; }
+
+    const bin = atob(base64Data.split(',')[1]);
+    const arr = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+
+    audioCtx.decodeAudioData(arr.buffer.slice(0)).then(buf => {
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(audioCtx.currentTime + 0.05);
+    }).catch(() => {});
+  } catch(e){}
+}
+
+function dmTypingNotify(){
+  if(!dmWith) return;
+  publish('typing', { name: myName, to: dmWith, scope: 'dm' });
+}
+function handleTyping(d){
+  if(d.name === myName) return;
+  if(d.scope === 'dm' && d.to === myName){
+    const bar = document.getElementById('dmTypingBar');
+    const dmOpen = !document.getElementById('dmConvView').classList.contains('hidden');
+    if(dmOpen && dmWith === d.name){
+      bar.textContent = `✍️ ${d.name} يكتب الآن...`;
+      clearTimeout(typingTimers['dm_' + d.name]);
+      typingTimers['dm_' + d.name] = setTimeout(()=>{ bar.textContent = ''; }, 3000);
+    }
+  }
+}
+
+function handleControl(d){
+  if(d.target && cloudAccounts[d.target]){
+    if(d.mutedUntil !== undefined){ cloudAccounts[d.target].mutedUntil = d.mutedUntil; }
+    if(d.isBanned !== undefined){ cloudAccounts[d.target].isBanned = d.isBanned; }
+    if(d.pass !== undefined){ cloudAccounts[d.target].pass = d.pass; }
+    if(d.isMod !== undefined){ cloudAccounts[d.target].isMod = d.isMod; }
+    saveAndSyncAccounts();
+    if(d.target === myName && d.mutedUntil){
+      toast(d.mutedUntil > Date.now() ? '🔇 تم كتمك' : '🔊 تم فك الكتم');
+    }
+  }
+}
+
+function handleAuth(){
+  const name = document.getElementById('accName').value.trim();
+  const pass = document.getElementById('accPass').value;
+  const passConfirm = document.getElementById('accPassConfirm').value;
+  const gender = document.getElementById('accGender').value;
+  const age = document.getElementById('accAge').value;
+  const err = document.getElementById('authErr');
+
+  if(!name || !pass){ err.textContent = '⚠️ يرجى ملء كافة الخانات'; return; }
+
+  if(currentTab === 'register'){
+    if(pass !== passConfirm){ err.textContent = '❌ كلمة المرور غير متطابقة!'; return; }
+    if(!age || age < 10){ err.textContent = '⚠️ أدخل عمر صحيح (10+ سنوات)'; return; }
+    if(cloudAccounts[name]){ err.textContent = '⚠️ الاسم مسجل مسبقاً'; return; }
+
+    const idNum = Math.floor(10000000 + Math.random() * 90000000).toString();
+    const newUser = {
+      pass, points: 50, gender, age: parseInt(age), bio: 'مستخدم جديد في دردشة النجوم ✨', idNum,
+      isAdmin: false, isMod: false, avatar: registerAvatarData,
+      mutedUntil: 0, isBanned: false, diamonds: 0, following: [], mutes: []
+    };
+    cloudAccounts[name] = newUser;
+    saveAndSyncAccounts();
+    publish('sync_account', { name, user: newUser });
+    toast('✨ تم إنشاء حسابك بنجاح! رقم الـ ID الخاص بك: ' + idNum);
+    switchTab('login');
+  } else {
+    const userAcc = cloudAccounts[name];
+    if(!userAcc || userAcc.pass !== pass){ err.textContent = '❌ خطأ في البيانات أو كلمة المرور!'; return; }
+    if(userAcc.isBanned){ err.textContent = '🚷 هذا الحساب محظور!'; return; }
+
+    myName = name;
+    myPoints = userAcc.points !== undefined ? userAcc.points : 50;
+
+    publish('session_kick', { username: myName, sessionId: mySessionId });
+
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('chatScreen').classList.remove('hidden');
+    updateSoundBtn();
+    const role = myRole();
+    document.getElementById('whoAmI').innerHTML = 'أنت: <b>' + esc(myName) + '</b> (ID: ' + (userAcc.idNum || '---') + ')';
+
+    if(role !== 'user'){ document.getElementById('adminSecretBtn').classList.remove('hidden'); }
+
+    renderPoints();
+    showPage('pageChat');
+    setTimeout(()=> publish('dm_sync', { type: 'request', name: myName }), 1500);
+    publish('users', { type: 'join', name: myName, points: myPoints });
+
+    setInterval(()=>{ if(client?.connected) publish('users', { type:'ping', name: myName, points: myPoints }); }, 3000);
+    setInterval(renderOnlineUsers, 2000);
+  }
+}
+
+function saveAndSyncAccounts(){
+  localStorage.setItem('cloud_accounts_sync_v25', JSON.stringify(cloudAccounts));
+  renderLeaderboard();
+  renderSecretUsersList();
+}
+
+function renderPoints(){
+  if(myName && cloudAccounts[myName]){
+    cloudAccounts[myName].points = myPoints;
+    saveAndSyncAccounts();
+  }
+  document.getElementById('profPoints').textContent = myPoints;
+  if(client?.connected) publish('users', { type: 'ping', name: myName, points: myPoints });
+}
+
+function renderProfilePage(){
+  const u = cloudAccounts[myName] || {};
+  const role = myRole();
+  document.getElementById('profName').textContent = myName;
+  document.getElementById('profIdTag').textContent = 'ID: ' + (u.idNum || '---');
+  document.getElementById('editAgeInput').value = u.age || 20;
+  document.getElementById('editBioInput').value = u.bio || '';
+
+  const roleTxt = role === 'admin' ? 'أدمن 👑' : role === 'mod' ? 'مساعد أدمن 🛡️' : 'مستخدم ⭐';
+  document.getElementById('profRole').textContent = roleTxt;
+
+  renderMyStatus();
+
+  const img = document.getElementById('profAvatarImg');
+  const fb = document.getElementById('profAvatarFb');
+  if(u.avatar){ img.src = u.avatar; img.classList.remove('hidden'); fb.classList.add('hidden'); }
+  else { img.classList.add('hidden'); fb.classList.remove('hidden'); }
+
+  const myDiamonds = u.diamonds || 0;
+  document.getElementById('profDiamonds').textContent = myDiamonds;
+  const lvlBadge = document.getElementById('profLevelBadge');
+  const lvlNum   = document.getElementById('profLevelNum');
+  
+  if(isFemale(myName)){
+    const li = getLevelInfo(myDiamonds);
+    lvlBadge.classList.remove('hidden');
+    lvlBadge.textContent = 'المستوى ' + li.lvl;
+    lvlNum.textContent = li.lvl;
+  } else {
+    lvlBadge.classList.add('hidden');
+    lvlNum.textContent = '—';
+  }
+}
+
+const STATUS_TOAST = { online: '🟢 أنت متاح الآن', busy: '🔴 أنت مشغول الآن', away: '🟡 أنت بعيد الآن' };
+function setMyStatus(st){
+  if(!cloudAccounts[myName]) return;
+  cloudAccounts[myName].status = st;
+  saveAndSyncAccounts();
+  publish('sync_account', { name: myName, user: cloudAccounts[myName] });
+  renderMyStatus();
+  toast(STATUS_TOAST[st] || 'تم تحديث حالتك');
+}
+function renderMyStatus(){
+  const st = (cloudAccounts[myName] || {}).status || 'online';
+  ['online','busy','away'].forEach(s => {
+    const el = document.getElementById('status_' + s);
+    if(el) el.classList.toggle('active', s === st);
+  });
+}
+
+function updateMyProfileDetails(){
+  const newAge = parseInt(document.getElementById('editAgeInput').value) || 20;
+  const newBio = document.getElementById('editBioInput').value.trim();
+  if(cloudAccounts[myName]){
+    cloudAccounts[myName].age = newAge;
+    cloudAccounts[myName].bio = newBio;
+    saveAndSyncAccounts();
+    publish('sync_account', { name: myName, user: cloudAccounts[myName] });
+    toast('✅ تم حفظ التعديلات بنجاح');
+  }
+}
+
+function changeMyAvatar(){
+  const f = document.getElementById('profAvatarInput').files[0];
+  document.getElementById('profAvatarInput').value = '';
+  if(!f) return;
+  if(f.size > 300 * 1024){ toast('⚠️ الصورة كبيرة! أقل من 300KB'); return; }
+  const r = new FileReader();
+  r.onload = ev => {
+    cloudAccounts[myName].avatar = ev.target.result;
+    saveAndSyncAccounts();
+    publish('sync_account', { name: myName, user: cloudAccounts[myName] });
+    toast('🖼️ تم تحديث صورتك بنجاح!');
+    renderProfilePage();
+  };
+  r.readAsDataURL(f);
+}
+
+function openSecretAdminModal(){
+  const r = myRole();
+  if(r === 'user'){ toast('⚠️ للإدارة والمشرفين فقط!'); return; }
+  document.getElementById('adminOverlay').classList.remove('hidden');
+  document.getElementById('adminRoleLabel').textContent = r === 'admin' ? 'الصلاحية: أدمن رئيسي 👑' : 'الصلاحية: مساعد أدمن (شحن وكتم وتغيير باسورد) 🛡️';
+  renderSecretUsersList();
+}
+function closeSecretAdminModal(){ document.getElementById('adminOverlay').classList.add('hidden'); }
+
+function adminChangePassword(){
+  const target = document.getElementById('adminPassTarget').value.trim();
+  const newPass = document.getElementById('adminNewPass').value;
+  if(!target || !newPass){ toast('⚠️ يرجى إدخال اسم الحساب وكلمة المرور الجديدة'); return; }
+  if(cloudAccounts[target]){
+    cloudAccounts[target].pass = newPass;
+    saveAndSyncAccounts();
+    publish('control', { target, pass: newPass });
+    toast(`🔒 تم تغيير كلمة مرور ${target} بنجاح`);
+  } else toast('❌ الحساب غير موجود!');
+}
+
+function adminToggleMod(){
+  if(myRole() !== 'admin'){ toast('⚠️ هذه الصلاحية للأدمن الرئيسي فقط!'); return; }
+  const target = document.getElementById('adminModTarget').value.trim();
+  if(!target || !cloudAccounts[target]){ toast('❌ الحساب غير موجود!'); return; }
+  const currentMod = !!cloudAccounts[target].isMod;
+  cloudAccounts[target].isMod = !currentMod;
+  saveAndSyncAccounts();
+  publish('control', { target, isMod: cloudAccounts[target].isMod });
+  toast(`🛡️ تم تحديث رتبة ${target} إلى مساعد: ${!currentMod ? 'نعم' : 'لا'}`);
+}
+
+function adminGrantPoints(){
+  const target = document.getElementById('adminTargetUser').value.trim();
+  const amount = parseInt(document.getElementById('adminPointsAmount').value) || 0;
+  if(!target || amount <= 0){ toast('⚠️ بيانات غير صحيحة'); return; }
+  if(cloudAccounts[target]){
+    cloudAccounts[target].points = (cloudAccounts[target].points || 0) + amount;
+    saveAndSyncAccounts();
+    publish('admin_points', { target, amount, newPts: cloudAccounts[target].points });
+    toast(`🎁 تم شحن ${amount} عملة لـ ${target}`);
+  } else toast('❌ الحساب غير موجود!');
+}
+
+function adminMute(){
+  const target = document.getElementById('adminMuteTarget').value.trim();
+  const mins = parseInt(document.getElementById('adminMuteMins').value) || 0;
+  if(!target || !cloudAccounts[target]){ toast('❌ الحساب غير موجود!'); return; }
+  const until = mins > 0 ? Date.now() + mins * 60000 : 0;
+  cloudAccounts[target].mutedUntil = until;
+  saveAndSyncAccounts();
+  publish('control', { target, mutedUntil: until });
+  toast('تم التنفيذ ✅');
+}
+
+function renderSecretUsersList(){
+  const container = document.getElementById('allCloudUsersList');
+  if(!container) return;
+  container.innerHTML = '<h4>📋 الحسابات المسجلة وكلمات المرور</h4>';
+  Object.keys(cloudAccounts).forEach(u => {
+    const acc = cloudAccounts[u];
+    container.innerHTML += `<div style="padding:4px 0; border-bottom:1px solid #ede9fe; font-size:11px;"><b>${esc(u)}</b> | باسورد: <span style="color:#e53e3e; font-weight:bold;">${esc(acc.pass || '---')}</span> | (ID: ${acc.idNum || '---'}) | ${acc.points || 0} عملة</div>`;
+  });
+}
+
+function openBuyModal(){ document.getElementById('buyOverlay').classList.remove('hidden'); calcPrice(); }
+function closeBuyModal(){ document.getElementById('buyOverlay').classList.add('hidden'); }
+function calcPrice(){
+  const pts = parseInt(document.getElementById('reqPointsInput').value) || 0;
+  document.getElementById('calcPriceUsd').textContent = '$' + (pts / 50).toFixed(2);
+}
+function confirmBuyRequest(){
+  const pts = parseInt(document.getElementById('reqPointsInput').value) || 0;
+  if(pts <= 0) return;
+  const reqMsg = {
+    id: 'req_' + Date.now(), sys: true, from: myName, to: ADMIN_NAME,
+    text: `💎 طلب شحن عملات من الذكر ${myName}: ${pts} عملة`
+  };
+  publish('dm', reqMsg);
+  (dmHistory[ADMIN_NAME] = dmHistory[ADMIN_NAME] || []).push(reqMsg);
+  saveDmHistory();
+  toast('✅ تم إرسال طلب الشحن للأدمن');
+  closeBuyModal();
+}
+
+function openWithdrawModal(){ document.getElementById('withdrawOverlay').classList.remove('hidden'); }
+function closeWithdrawModal(){ document.getElementById('withdrawOverlay').classList.add('hidden'); }
+function confirmWithdrawRequest(){
+  const amt = parseInt(document.getElementById('reqWithdrawInput').value) || 0;
+  if(amt <= 0) return;
+  const reqMsg = {
+    id: 'wdr_' + Date.now(), sys: true, from: myName, to: ADMIN_NAME,
+    text: `💸 طلب سحب أرباح من الأنثى ${myName}: ${amt} عملة`
+  };
+  publish('dm', reqMsg);
+  (dmHistory[ADMIN_NAME] = dmHistory[ADMIN_NAME] || []).push(reqMsg);
+  saveDmHistory();
+  toast('✅ تم إرسال طلب السحب للأدمن بنجاح');
+  closeWithdrawModal();
+}
+
+function publish(sub, obj){ if(client?.connected) client.publish(roomTopic + '/' + sub, JSON.stringify(obj)); }
+
+function changeUserPoints(name, delta){
+  if(!cloudAccounts[name]) return;
+  cloudAccounts[name].points = Math.max(0, (cloudAccounts[name].points || 0) + delta);
+  saveAndSyncAccounts();
+  publish('admin_points', { target: name, amount: delta, newPts: cloudAccounts[name].points });
+  publish('sync_account', { name: name, user: cloudAccounts[name] });
+  if(name === myName){ myPoints = cloudAccounts[name].points; renderPoints(); }
+}
+
+function handleUsersList(d){
+  if(d.name){
+    onlineUsers[d.name] = Date.now();
+    if(cloudAccounts[d.name] && d.points !== undefined){
+      cloudAccounts[d.name].points = d.points;
+      saveAndSyncAccounts();
+    }
+  }
+  renderOnlineUsers();
+}
+
+function getOnlineList(){
+  const now = Date.now();
+  const list = [];
+  Object.keys(onlineUsers).forEach(n=>{
+    if(now - onlineUsers[n] > 300000) delete onlineUsers[n];
+    else list.push(n);
+  });
+  return list;
+}
+
+function renderOnlineUsers(){
+  const list = document.getElementById('onlineUsersList');
+  if(!list) return;
+  list.innerHTML = '';
+
+  const now = Date.now();
+  Object.keys(cloudAccounts).forEach(n => {
+    if(n === myName) return;
+    const isOnline = onlineUsers[n] && (now - onlineUsers[n] <= 300000);
+    const u = cloudAccounts[n] || {};
+    const isUserStaff = isStaff(n);
+
+    const div = document.createElement('div');
+    div.className = 'user-card-row';
+    div.innerHTML = `
+      <div class="user-card-right">
+        ${avatarHtml(u, isOnline)}
+        <div class="user-card-info">
+          <div class="user-card-name">${esc(n)} ${isUserStaff ? '🛡️' : ''}</div>
+          <div class="user-card-badges">
+            <span class="badge-gender">${u.gender || 'ذكر 👨'}</span>
+          </div>
+          <span class="user-card-status">${esc(u.bio || 'اللهم اعف عنا...')}</span>
+        </div>
+      </div>
+      <button class="hi-btn" onclick="event.stopPropagation(); openDmConv('${esc(n)}'); showPage('pageDMs');">
+        💜 HI
+      </button>
+    `;
+    div.onclick = () => openUserProfile(n);
+    list.appendChild(div);
+  });
+  renderDmListView();
+}
+
+let viewingUser = null;
+function openUserProfile(username){
+  viewingUser = username;
+  const u = cloudAccounts[username] || {};
+  document.getElementById('upName').textContent = username;
+  document.getElementById('upIdTag').textContent = 'ID: ' + (u.idNum || '---');
+  document.getElementById('upBio').textContent = u.bio || '';
+  document.getElementById('upDetails').textContent = `النوع: ${u.gender || 'غير محدد'} | العمر: ${u.age || 'غير محدد'}`;
+
+  const avatarBox = document.getElementById('upAvatarBox');
+  avatarBox.innerHTML = (u && u.avatar) ? `<img style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #9f7aea;" src="${u.avatar}">` : `<div style="width:100px; height:100px; border-radius:50%; background:#9f7aea; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:45px;">👤</div>`;
+
+  const myAcc = cloudAccounts[myName] || {};
+  const isFollowing = Array.isArray(myAcc.following) && myAcc.following.includes(username);
+  const fBtn = document.getElementById('upFollowBtn');
+  fBtn.textContent = isFollowing ? 'أصدقاء ✓' : '➕ متابعة';
+  fBtn.className = 'follow-btn ' + (isFollowing ? 'following' : '');
+
+  const mutes = Array.isArray(myAcc.mutes) ? myAcc.mutes : [];
+  const isMutedByMe = mutes.includes(username);
+  const muteBtn = document.getElementById('upMuteBtn');
+  muteBtn.textContent = isMutedByMe ? '🔊 إلغاء الكتم' : '🔇 كتم المستخدم';
+
+  document.getElementById('upChatBtn').onclick = () => {
+    openDmConv(username);
+    showPage('pageDMs');
+  };
+
+  showPage('pageUserProfile');
+}
+
+function toggleFollow(targetName){
+  const myAcc = cloudAccounts[myName];
+  if(!myAcc.following) myAcc.following = [];
+  const idx = myAcc.following.indexOf(targetName);
+  if(idx > -1){
+    myAcc.following.splice(idx, 1);
+    toast(`تم إلغاء متابعة ${targetName}`);
+  } else {
+    myAcc.following.push(targetName);
+    toast(`أنت تتابع الآن ${targetName}`);
+
+    const followSysMsg = {
+      id: 'follow_' + Date.now(), sys: true, from: myName, to: targetName,
+      text: `✨ قام ${myName} بمتابعتك الآن!`
+    };
+    publish('dm', followSysMsg);
+    if(targetName === myName){
+      (dmHistory[targetName] = dmHistory[targetName] || []).push(followSysMsg);
+      saveDmHistory();
+    }
+  }
+  saveAndSyncAccounts();
+  publish('sync_account', { name: myName, user: myAcc });
+  renderOnlineUsers();
+  if(viewingUser === targetName) openUserProfile(targetName);
+}
+
+function toggleFollowTarget(){
+  if(viewingUser) toggleFollow(viewingUser);
+}
+
+function toggleMuteTarget(){
+  if(!viewingUser) return;
+  const myAcc = cloudAccounts[myName];
+  if(!myAcc.mutes) myAcc.mutes = [];
+  const idx = myAcc.mutes.indexOf(viewingUser);
+  if(idx > -1){
+    myAcc.mutes.splice(idx, 1);
+    toast(`🔊 تم إلغاء كتم ${viewingUser}`);
+  } else {
+    myAcc.mutes.push(viewingUser);
+    toast(`🔇 تم كتم ${viewingUser} بنجاح`);
+  }
+  saveAndSyncAccounts();
+  publish('sync_account', { name: myName, user: myAcc });
+  openUserProfile(viewingUser);
+}
+
+function searchUserById(){
+  const query = document.getElementById('searchIdInput').value.trim();
+  if(!query){ toast('⚠️ أدخل رقم الـ ID أو اسم الحساب للبحث'); return; }
+  let found = null;
+  Object.keys(cloudAccounts).forEach(n => {
+    if(cloudAccounts[n].idNum === query || n.includes(query)){ found = n; }
+  });
+  if(found){
+    openUserProfile(found);
+    toast(`✅ تم العثور على: ${found}`);
+  } else {
+    toast('❌ لم يتم العثور على أي حساب مطابق');
+  }
+}
+
+function renderLeaderboard(){
+  const list = document.getElementById('leaderboardList');
+  if(!list) return;
+  list.innerHTML = '';
+  let normalUsers = [];
+  Object.keys(cloudAccounts).forEach(n=>{ if(n !== 'sasa') normalUsers.push({ name: n, points: cloudAccounts[n].points || 0 }); });
+  normalUsers.sort((a, b) => b.points - a.points);
+
+  const topCard = document.getElementById('topWinnerCard');
+  if(normalUsers.length > 0){
+    document.getElementById('top1Name').textContent = normalUsers[0].name;
+    document.getElementById('top1Pts').textContent = normalUsers[0].points;
+    topCard.classList.remove('hidden');
+  } else topCard.classList.add('hidden');
+}
+
+function setDmFilter(filter, btnEl){
+  currentDmFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+  renderDmListView();
+}
+
+function renderDmListView(){
+  const convBox = document.getElementById('dmConversationsList');
+  if(!convBox) return;
+
+  convBox.innerHTML = '';
+  const now = Date.now();
+  const partners = Object.keys(dmHistory).filter(p => {
+    return (dmHistory[p] || []).length > 0;
+  });
+
+  const filtered = partners.filter(p => {
+    const isOnline = onlineUsers[p] && (now - onlineUsers[p] <= 300000);
+    const hasUnread = (unreadDm[p] || 0) > 0;
+    const isMutual = isMutualFriends(myName, p);
+
+    if(currentDmFilter === 'online' && !isOnline) return false;
+    if(currentDmFilter === 'unread' && !hasUnread) return false;
+    if(currentDmFilter === 'friends' && !isMutual) return false;
+    return true;
+  });
+
+  filtered.forEach(p => {
+    const last = dmHistory[p][dmHistory[p].length - 1];
+    const isOnline = onlineUsers[p] && (now - onlineUsers[p] <= 300000);
+    const div = document.createElement('div');
+    div.className = 'conv-item';
+    const lastText = last.type === 'gift' ? `🎁 أرسل هدية: ${last.giftName}` : last.type === 'img' ? '🖼️ صورة' : last.type === 'voice' ? '🎤 رسالة صوتية' : (last.text || '').slice(0, 40);
+    const cnt = unreadDm[p] ? `<span class="unread-badge">${unreadDm[p]}</span>` : '';
+    const mutualBadge = isMutualFriends(myName, p) ? '<span style="color:#38a169; font-size:11px; font-weight:bold;">(أصدقاء 🤝 مجاني)</span>' : '';
+
+    div.innerHTML = `${avatarHtml(cloudAccounts[p], isOnline)} <div class="c-info"><span class="c-name">${esc(p)} ${mutualBadge}</span><span class="c-last">${esc(lastText)}</span></div> ${cnt}`;
+    div.onclick = () => openDmConv(p);
+    convBox.appendChild(div);
+  });
+}
+
+function openDmConv(partner){
+  if(partner === myName){ toast('⚠️ لا يمكنك المراسلة مع نفسك'); return; }
+
+  dmWith = partner;
+  unreadDm[partner] = 0;
+
+  const buyBtn = document.getElementById('buyBtnAction');
+  const withdrawBtn = document.getElementById('withdrawBtnAction');
+
+  if(buyBtn) buyBtn.classList.add('hidden');
+  if(withdrawBtn) withdrawBtn.classList.add('hidden');
+
+  if(isStaff(partner)){
+    if(isFemale(myName)){
+      if(withdrawBtn) withdrawBtn.classList.remove('hidden');
+    } else {
+      if(buyBtn) buyBtn.classList.remove('hidden');
+    }
+  }
+
+  const isMutual = isMutualFriends(myName, partner);
+  document.getElementById('dmConvTitle').textContent = '📩 محادثة مع ' + partner + (isMutual ? ' (أصدقاء مجاني 🤝)' : '');
+  document.getElementById('dmListView').classList.add('hidden');
+  document.getElementById('dmConvView').classList.remove('hidden');
+  renderDmHistory();
+}
+
+function closeDmConv(){
+  dmWith = null;
+  document.getElementById('dmConvView').classList.add('hidden');
+  document.getElementById('dmListView').classList.remove('hidden');
+  renderDmListView();
+}
+
+function renderDmHistory(){
+  const box = document.getElementById('dmMsgs');
+  box.innerHTML = '';
+  (dmHistory[dmWith] || []).forEach(m => appendDmBubble(m));
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendDmBubble(m){
+  const box = document.getElementById('dmMsgs');
+  const div = document.createElement('div');
+  if(m.sys){
+    div.className = 'msg sys';
+    div.textContent = m.text;
+  } else {
+    const mine = m.from === myName;
+    div.className = 'msg ' + (mine ? 'mine' : 'theirs');
+    let body = `<span class="msg-text">${esc(m.text)}</span>`;
+    if(m.type === 'gift'){
+      body = `<div style="font-size:15px; font-weight:bold;">${m.gift} هدية: ${m.giftName} <span style="font-size:11px; opacity:.8;">(${m.amount} عملة)</span></div>`;
+    } else if(m.type === 'img'){
+      body = `<img class="dm-img-thumb" src="${m.img}" onclick="openFullImage('${m.img}')">`;
+    } else if(m.type === 'voice'){
+      body = `<audio controls src="${m.audio}"></audio>`;
+    } else if(m.type === 'ttt_invite'){
+      if(m.handled){
+        body = `<div style="font-size:13px;">🎮 انتهى هذا التحدي (تم الرد عليه)</div>`;
+      } else {
+        body = `<div style="font-size:14px; font-weight:bold; margin-bottom:4px;">🎮 تحدي إكس أو برهان ${m.stake || 5} 🪙!</div>
+          <div style="font-size:12px; opacity:.85; margin-bottom:8px;">الفائز يكسب ${(m.stake || 5) * 2 - 2} عملة — والخاسر يخسر رهانه كله!</div>
+          <div style="display:flex; gap:6px;">
+            <button class="dm-act-btn" style="background:linear-gradient(90deg,#38a169,#48bb78); flex:1;" onclick="event.stopPropagation(); respondTttInvite('${m.id}','${esc(m.from)}','accept')">✅ قبول</button>
+            <button class="dm-act-btn btn-red" style="flex:1;" onclick="event.stopPropagation(); respondTttInvite('${m.id}','${esc(m.from)}','decline')">❌ رفض</button>
+          </div>`;
+      }
+    }
+    const isOnline = onlineUsers[m.from] && (Date.now() - onlineUsers[m.from] <= 300000);
+    div.innerHTML = `${avatarHtml(cloudAccounts[m.from], isOnline, 'msg-avatar')}<b>${esc(m.from)}:</b> ${body}`;
+  }
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function openFullImage(src){
+  document.getElementById('modalFullImg').src = src;
+  document.getElementById('imgModal').classList.remove('hidden');
+}
+
+function saveDmHistory(){ localStorage.setItem('dm_history_v25', JSON.stringify(dmHistory)); }
+
+function handleDmSync(d){
+  if(d.type === 'request' && d.name && d.name !== myName){
+    const hist = dmHistory[d.name] || [];
+    if(hist.length) publish('dm_sync', { type: 'data', for: d.name, msgs: hist.slice(-50) });
+  } else if(d.type === 'data' && d.for === myName){
+    (d.msgs || []).forEach(m => {
+      if(m.to === myName && m.from){
+        const h = dmHistory[m.from] = dmHistory[m.from] || [];
+        if(!h.some(x => x.id === m.id)) h.push(m);
+      }
+    });
+    saveDmHistory();
+  }
+}
+
+function sendDm(){
+  const inp = document.getElementById('dmInput');
+  const text = inp.value.trim();
+  if(!text || !dmWith) return;
+  if(isMutedNow(myName)){ toast('🔇 أنت مكتوم من الإدارة!'); return; }
+
+  const partnerAcc = cloudAccounts[dmWith] || {};
+  const partnerMutes = Array.isArray(partnerAcc.mutes) ? partnerAcc.mutes : [];
+  if(partnerMutes.includes(myName)){
+    toast('⚠️ لقد قام هذا المستخدم بكتمك، لا يمكنك مراسلته.');
+    return;
+  }
+
+  if(!isStaff(myName) && !isStaff(dmWith)){
+    const isMutual = isMutualFriends(myName, dmWith);
+    if(!isMutual){
+      if(!isFemale(myName)){
+        if(myPoints < 3){
+          toast('⚠️ رصيدك أقل من 3 عملات! يرجى شحن رصيدك.');
+          return;
+        }
+        myPoints -= 3;
+        renderPoints();
+        toast('🪙 تم خصم 3 عملات للرسالة');
+
+        if(isFemale(dmWith) && cloudAccounts[dmWith]){
+          cloudAccounts[dmWith].diamonds = (cloudAccounts[dmWith].diamonds || 0) + 3;
+          publish('sync_account', { name: dmWith, user: cloudAccounts[dmWith] });
+          saveAndSyncAccounts();
+        }
+      }
+    }
+  }
+
+  const msg = { id: 'dm_' + Date.now(), from: myName, to: dmWith, text };
+  publish('dm', msg);
+  (dmHistory[dmWith] = dmHistory[dmWith] || []).push(msg);
+  saveDmHistory();
+  appendDmBubble(msg);
+  inp.value = '';
+}
+
+function sendDmImage(inputEl){
+  const f = inputEl.files[0];
+  inputEl.value = '';
+  if(!f || !dmWith) return;
+  if(f.size > 280 * 1024){ toast('⚠️ الصورة كبيرة! أقل من 280KB'); return; }
+
+  const partnerAcc = cloudAccounts[dmWith] || {};
+  const partnerMutes = Array.isArray(partnerAcc.mutes) ? partnerAcc.mutes : [];
+  if(partnerMutes.includes(myName)){
+    toast('⚠️ لقد قام هذا المستخدم بكتمك، لا يمكنك مراسلته.');
+    return;
+  }
+
+  if(!isStaff(myName) && !isStaff(dmWith)){
+    const isMutual = isMutualFriends(myName, dmWith);
+    if(!isMutual && !isFemale(myName)){
+      if(myPoints < 3){
+        toast('⚠️ رصيدك أقل من 3 عملات للإرسال!');
+        return;
+      }
+      myPoints -= 3;
+      renderPoints();
+      if(isFemale(dmWith) && cloudAccounts[dmWith]){
+        cloudAccounts[dmWith].diamonds = (cloudAccounts[dmWith].diamonds || 0) + 3;
+        publish('sync_account', { name: dmWith, user: cloudAccounts[dmWith] });
+        saveAndSyncAccounts();
+      }
+    }
+  }
+
+  const r = new FileReader();
+  r.onload = ev => {
+    const msg = { id: 'dmimg_' + Date.now(), from: myName, to: dmWith, type: 'img', img: ev.target.result };
+    publish('dm', msg);
+    (dmHistory[dmWith] = dmHistory[dmWith] || []).push(msg);
+    saveDmHistory();
+    appendDmBubble(msg);
+  };
+  r.readAsDataURL(f);
+}
+
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+async function toggleVoiceRecord(){
+  const btn = document.getElementById('dmVoiceBtn');
+  if(!isRecording){
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast('⚠️ متصفحك لا يدعم التسجيل الصوتي');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = e => { if(e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const voiceMsg = { id: 'dmvoice_' + Date.now(), from: myName, to: dmWith, type: 'voice', audio: ev.target.result };
+          publish('dm', voiceMsg);
+          (dmHistory[dmWith] = dmHistory[dmWith] || []).push(voiceMsg);
+          saveDmHistory();
+          appendDmBubble(voiceMsg);
+          toast('🎤 تم إرسال التسجيل الصوتي');
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      btn.style.background = '#e53e3e';
+      toast('🎙️ جاري التسجيل... انقر مجدداً للإرسال');
+    } catch(e) {
+      toast('❌ تم رفض إذن الميكروفون!');
+      isRecording = false;
+      btn.style.background = '';
+    }
+  } else {
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    isRecording = false;
+    btn.style.background = '';
+  }
+}
+
+function handleDm(d){
+  if(d.from !== myName && d.to !== myName) return;
+
+  const myAcc = cloudAccounts[myName] || {};
+  const myMutes = Array.isArray(myAcc.mutes) ? myAcc.mutes : [];
+  if(d.from !== myName && myMutes.includes(d.from)){ return; }
+
+  const partner = (d.from === myName) ? d.to : d.from;
+  const hist = dmHistory[partner] = dmHistory[partner] || [];
+  if(hist.some(m => m.id === d.id)) return;
+  hist.push(d);
+  saveDmHistory();
+  if(d.to === myName){
+    dmSound();
+    const dmOpen = !document.getElementById('dmConvView').classList.contains('hidden');
+    if(dmOpen && dmWith === partner){ appendDmBubble(d); }
+    else {
+      unreadDm[partner] = (unreadDm[partner] || 0) + 1;
+      toast(`📩 رسالة جديدة من ${partner}`);
+      renderDmListView();
+    }
+  }
+}
+
+function showGamePicker(){
+  document.getElementById('gameUserPicker').classList.remove('hidden');
+  renderGameUserList();
+}
+function renderGameUserList(){
+  const box = document.getElementById('gameUserList');
+  if(!box) return;
+  box.innerHTML = '';
+  const now = Date.now();
+  getOnlineList().filter(n => n !== myName && (now - onlineUsers[n] <= 300000)).forEach(n => {
+    const u = cloudAccounts[n] || {};
+    const div = document.createElement('div');
+    div.className = 'user-card-row';
+    div.innerHTML = `
+      <div class="user-card-right">
+        ${avatarHtml(u, true)}
+        <div class="user-card-info"><span class="user-card-name">${esc(n)}</span><span class="user-card-status">متصل وجاهز للتحدي! 🎮</span></div>
+      </div>
+      <button class="hi-btn" style="background:#ede9fe; color:#6b46c1;">تحدي ⚔️</button>
+    `;
+    div.onclick = () => inviteTTT(n);
+    box.appendChild(div);
+  });
+}
+
+let ttt = { gameId: null, active: false, waiting: false, board: Array(9).fill(''), myMark: 'X', opp: null, myTurn: false, stake: 5, waitDeadline: 0 };
+
+function playSoon(name){ toast(`🔒 ${name} — قادمة قريباً! ترقبوا التحديثات ✨`); }
+
+function inviteTTT(target){
+  let stake = parseInt(document.getElementById('tttStakeInput').value) || 5;
+  if(stake < 1) stake = 1;
+  if(myPoints < stake){
+    toast('⚠️ رصيدك غير كافٍ لرهان ' + stake + ' عملة!');
+    return;
+  }
+  myPoints -= stake; renderPoints();
+  ttt = { gameId: 'g_' + Date.now(), active: false, waiting: true, board: Array(9).fill(''), myMark: 'X', opp: target, myTurn: false, stake: stake, waitDeadline: Date.now() + 60000 };
+  publish('game', { type: 'ttt_invite', sender: myName, target, gameId: ttt.gameId, stake });
+  const note = document.getElementById('gameWaitNote');
+  note.textContent = `⏳ في انتظار ${target}... (رهانك: ${stake} 🪙)`;
+  toast('📩 أُرسل التحدي — تم خصم ' + stake + ' عملة من رصيدك');
+}
+
+function handleGameEvents(d){
+  if(d.type === 'ttt_invite' && d.target === myName){
+    if(ttt.active || ttt.waiting){
+      publish('game', { type: 'ttt_decline', inviter: d.sender, accepter: myName });
+      return;
+    }
+    publish('dm', { id: 'tttinv_' + Date.now(), from: d.sender, to: myName, type: 'ttt_invite', gameId: d.gameId, stake: d.stake || 5, text: `🎮 ${d.sender} يتحداك في إكس أو برهان ${d.stake || 5} 🪙!` });
+    return;
+  }
+  if(d.type === 'ttt_accept'){
+    if(d.inviter === myName && ttt.waiting){
+      ttt.waiting = false;
+      startTttGame(d.inviter, d.accepter, ttt.gameId, ttt.stake || d.stake || 5);
+      toast('✅ تم قبول التحدي — بالتوفيق!');
+    }
+    return;
+  }
+  if(d.type === 'ttt_decline' && d.inviter === myName){
+    if(ttt.waiting){
+      if(ttt.stake){ myPoints += ttt.stake; renderPoints(); toast('💰 رُدّ رهانك: +' + ttt.stake + ' عملة'); }
+      ttt.waiting = false; document.getElementById('gameWaitNote').textContent = '';
+    }
+    toast(`❌ ${d.accepter} رفض التحدي`);
+    return;
+  }
+  if(d.type === 'ttt_move' && ttt.active && d.gameId === ttt.gameId){
+    if(d.from === myName) return;
+    ttt.board[d.i] = d.mark;
+    renderTttBoard();
+    const w = tttCheckWin(ttt.board);
+    if(w === 'draw'){ finishTttGame(null, false); }
+    else if(w){ finishTttGame(d.from, false); }
+    else { ttt.myTurn = true; updateTttStatus(); }
+    return;
+  }
+  if(d.type === 'ttt_forfeit' && ttt.active && d.gameId === ttt.gameId && d.winner === myName){
+    finishTttGame(myName, false);
+  }
+}
+
+function respondTttInvite(id, from, action){
+  const hist = dmHistory[from] = dmHistory[from] || [];
+  const msg = hist.find(x => x.id === id);
+  const gameId = msg ? msg.gameId : ('g_' + Date.now());
+  if(msg){ msg.handled = true; saveDmHistory(); }
+  if(action === 'accept'){
+    const stake = (msg && msg.stake) || 5;
+    if(myPoints < stake){
+      toast('⚠️ رصيدك غير كافٍ لقبول رهان ' + stake + ' عملة!');
+      renderDmHistory();
+      return;
+    }
+    myPoints -= stake; renderPoints();
+    publish('game', { type: 'ttt_accept', inviter: from, accepter: myName, gameId, stake });
+    startTttGame(from, myName, gameId, stake);
+    renderDmHistory();
+  } else {
+    publish('game', { type: 'ttt_decline', inviter: from, accepter: myName });
+    publish('dm', { id: 'tttdec_' + Date.now(), sys: true, from: myName, to: from, text: `❌ ${myName} رفض تحدي إكس أو` });
+    renderDmHistory();
+    toast('❌ تم رفض التحدي');
+  }
+}
+
+function startTttGame(inviter, accepter, gameId, stake){
+  ttt = { gameId, active: true, waiting: false,
+          board: Array(9).fill(''),
+          myMark: (inviter === myName) ? 'X' : 'O',
+          opp: (inviter === myName) ? accepter : inviter,
+          myTurn: (inviter === myName),
+          stake: stake || 5, waitDeadline: 0 };
+  showPage('pageGame');
+  document.getElementById('gameWaitNote').textContent = '';
+  document.getElementById('gameUserPicker').classList.add('hidden');
+  document.getElementById('gameLobby').classList.add('hidden');
+  document.getElementById('gameBoardView').classList.remove('hidden');
+  renderTttBoard();
+  updateTttStatus();
+}
+
+function playTTT(i){
+  if(!ttt.active || !ttt.myTurn || ttt.board[i]) return;
+  ttt.board[i] = ttt.myMark;
+  publish('game', { type: 'ttt_move', gameId: ttt.gameId, from: myName, mark: ttt.myMark, i });
+  renderTttBoard();
+  const w = tttCheckWin(ttt.board);
+  if(w === 'draw'){ finishTttGame(null, true); }
+  else if(w){ finishTttGame(myName, true); }
+  else { ttt.myTurn = false; updateTttStatus(); }
+}
+
+function tttCheckWin(b){
+  const L = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for(const [a, c, e2] of L){ if(b[a] && b[a] === b[c] && b[a] === b[e2]) return b[a]; }
+  return b.every(x => x) ? 'draw' : null;
+}
+
+function renderTttBoard(){
+  document.querySelectorAll('.ttt-cell').forEach((cell, i) => {
+    cell.textContent = ttt.board[i] || '';
+    cell.classList.toggle('filled', !!ttt.board[i]);
+    cell.style.color = ttt.board[i] === 'X' ? '#6b46c1' : (ttt.board[i] === 'O' ? '#ec4899' : '#6b46c1');
+  });
+}
+
+function updateTttStatus(){
+  document.getElementById('gameStatusBig').textContent = ttt.myTurn
+    ? '🎮 دورك الآن — العب! (' + ttt.myMark + ')'
+    : `⏳ انتظر حركة ${ttt.opp}...`;
+}
+
+function finishTttGame(winner, announce){
+  if(!ttt.active) return;
+  const stake = ttt.stake || 5;
+  const prize = stake * 2 - TTT_COMMISSION;
+  ttt.active = false;
+  renderTttBoard();
+  const status = document.getElementById('gameStatusBig');
+  if(winner === myName){
+    myPoints += prize; renderPoints();
+    status.textContent = `🏆 فزت بالجولة! +${prize} عملة 🪙`;
+    toast('🏆 مبروك! كسبت ' + prize + ' عملة');
+  } else if(winner){
+    status.textContent = `😢 خسرت رهانك (${stake} 🪙) — الفائز: ${winner}`;
+    toast('😢 خسرت ' + stake + ' عملة رهان');
+  } else {
+    myPoints += stake; renderPoints();
+    if(ttt.opp) changeUserPoints(ttt.opp, stake);
+    status.textContent = `🤝 تعادل! رجع رهانك (${stake} 🪙)`;
+    toast('🤝 تعادل — رجع رهانك كامل');
+  }
+  if(announce && ttt.opp){
+    const prize2 = stake * 2 - TTT_COMMISSION;
+    const txt = winner ? `🏆 ${winner} فاز في إكس أو (+${prize2} عملة)` : `🤝 تعادل في إكس أو`;
+    const sysMsg = { id: 'tttend_' + Date.now(), sys: true, from: myName, to: ttt.opp, text: txt };
+    publish('dm', sysMsg);
+    (dmHistory[ttt.opp] = dmHistory[ttt.opp] || []).push(sysMsg);
+    saveDmHistory();
+  }
+  ttt = { gameId: null, active: false, waiting: false, board: Array(9).fill(''), myMark: 'X', opp: null, myTurn: false };
+}
+
+function exitGameBtn(){
+  if(ttt.active && ttt.opp){
+    publish('game', { type: 'ttt_forfeit', gameId: ttt.gameId, loser: myName, winner: ttt.opp });
+    finishTttGame(ttt.opp, true);
+  }
+  if(ttt.waiting){ ttt.waiting = false; document.getElementById('gameWaitNote').textContent = ''; }
+  resetGameToLobby();
+}
+
+window.addEventListener('pagehide', () => {
+  if(ttt.active && ttt.opp){ publish('game', { type: 'ttt_forfeit', gameId: ttt.gameId, loser: myName, winner: ttt.opp }); }
+});
+
+setInterval(() => {
+  if(ttt.active && ttt.opp){
+    const last = onlineUsers[ttt.opp] || 0;
+    if(Date.now() - last > 12000){
+      document.getElementById('gameStatusBig').textContent = `🔌 ${ttt.opp} غادر — فزت بالجولة!`;
+      finishTttGame(myName, true);
+    }
+  }
+  if(ttt.waiting && ttt.waitDeadline && Date.now() > ttt.waitDeadline){
+    const st = ttt.stake || 5;
+    ttt.waiting = false; ttt.waitDeadline = 0;
+    document.getElementById('gameWaitNote').textContent = '';
+    myPoints += st; renderPoints();
+    toast('⏰ انتهت مهلة الانتظار — رجع رهانك: +' + st + ' عملة');
+  }
+}, 4000);
+
+function resetGameToLobby(){
+  document.getElementById('gameBoardView').classList.add('hidden');
+  document.getElementById('gameLobby').classList.remove('hidden');
+}
+
+function openLevelPage(){
+  if(!isFemale(myName)){ toast('💎 نظام المستويات مخصص للبنات فقط!'); return; }
+  showPage('pageLevels');
+  renderLevelsPage();
+}
+
+const DIAMOND_LEVELS = [
+  { min: 0,     name: '🌱 بداية النجم' },
+  { min: 1000,  name: '⭐ نجمة صغيرة' },
+  { min: 3000,  name: '✨ نجمة لامعة' },
+  { min: 6000,  name: '🌙 قمر ساطع' },
+  { min: 10000, name: '☀️ شمس مشرقة' },
+  { min: 15000, name: '👑 ملكة النجوم' },
+  { min: 21000, name: '💎 أميرة الماس' },
+  { min: 28000, name: '💠 إمبراطورة الماس' },
+  { min: 36000, name: '🔥 أسطورة الماس' },
+  { min: 45000, name: '🌌 سيدة المجرات' },
+  { min: 55000, name: '🏆 أسطورة النجوم' }
+];
+
+function getLevelInfo(d){
+  d = d || 0;
+  let lvl = 0, name = DIAMOND_LEVELS[0].name, cur = 0, next = DIAMOND_LEVELS[1].min;
+  for(let i = DIAMOND_LEVELS.length - 1; i >= 0; i--){
+    if(d >= DIAMOND_LEVELS[i].min){
+      lvl = i; name = DIAMOND_LEVELS[i].name; cur = DIAMOND_LEVELS[i].min;
+      next = (i + 1 < DIAMOND_LEVELS.length) ? DIAMOND_LEVELS[i + 1].min : null;
+      break;
+    }
+  }
+  const pct = next ? Math.min(100, Math.round(((d - cur) / (next - cur)) * 100)) : 100;
+  return { lvl, name, cur, next, pct };
+}
+
+function renderLevelsPage(){
+  const d = (cloudAccounts[myName] && cloudAccounts[myName].diamonds) || 0;
+  const li = getLevelInfo(d);
+  document.getElementById('levelsHero').innerHTML = `
+    <div class="lh-level">المستوى ${li.lvl}</div>
+    <div class="lh-name">${li.name}</div>
+    <div class="lh-diamonds">💎 ${d.toLocaleString()} ماسة</div>`;
+  const box = document.getElementById('levelsList');
+  box.innerHTML = '';
+  DIAMOND_LEVELS.forEach((L, i) => {
+    const row = document.createElement('div');
+    row.className = 'level-row ' + (i === li.lvl ? 'current' : (i < li.lvl ? 'done' : 'locked'));
+    row.innerHTML = `<div class="lr-num">${i < li.lvl ? '✓' : i}</div>
+      <div class="lr-info"><div class="lr-name">${L.name}</div><div class="lr-req">${i === 0 ? '🌱 البداية — 0 ماسة' : 'يتطلب ' + L.min.toLocaleString() + ' ماسة 💎'}</div></div>
+      <div style="font-size:18px;">${i < li.lvl ? '🏆' : (i === li.lvl ? '🔥' : '🔒')}</div>`;
+    box.appendChild(row);
+  });
+}
+
+function openGiftModal(){ document.getElementById('giftOverlay').classList.remove('hidden'); }
+function closeGiftModal(){ document.getElementById('giftOverlay').classList.add('hidden'); }
+let selectedGiftIdx = -1;
+
+function selectGift(idx){
+  selectedGiftIdx = idx;
+  document.querySelectorAll('.gift-circle').forEach((c, i)=> c.classList.toggle('selected', i === idx));
+}
+
+function confirmGift(){
+  if(!dmWith || selectedGiftIdx < 0) return;
+  const g = GIFTS[selectedGiftIdx];
+  if(myPoints < GIFT_COST){
+    toast('⚠️ رصيدك غير كافٍ لإرسال الهدية (تحتاج 5 عملات)');
+    return;
+  }
+  myPoints -= GIFT_COST;
+  renderPoints();
+
+  if(isFemale(dmWith) && cloudAccounts[dmWith]){
+    cloudAccounts[dmWith].diamonds = (cloudAccounts[dmWith].diamonds || 0) + GIFT_COST;
+    publish('sync_account', { name: dmWith, user: cloudAccounts[dmWith] });
+    saveAndSyncAccounts();
+  }
+
+  const giftMsg = {
+    id: 'gift_' + Date.now(), from: myName, to: dmWith, type: 'gift',
+    gift: g.e, giftName: g.n, amount: GIFT_COST, text: `🎁 أرسل هدية ${g.e} (${g.n})`
+  };
+
+  publish('dm', giftMsg);
+  (dmHistory[dmWith] = dmHistory[dmWith] || []).push(giftMsg);
+  saveDmHistory();
+  appendDmBubble(giftMsg);
+  toast(`🎁 تم إرسال الهدية بنجاح إلى ${dmWith}`);
+  closeGiftModal();
+}
+
+function handleGift(d){
+  if(d.to !== myName && d.from !== myName) return;
+}
+
+const DM_EMOJIS = ['😀','😂','❤️','🔥','👍','🎉','🌹','⭐','✨'];
+function toggleDmEmoji(){
+  const p = document.getElementById('dmEmojiPanel');
+  if(p.classList.contains('hidden')){
+    if(!p.dataset.loaded){
+      p.innerHTML = DM_EMOJIS.map(e => `<span onclick="pickDmEmoji('${e}')">${e}</span>`).join('');
+      p.dataset.loaded = '1';
+    }
+    p.classList.remove('hidden');
+  } else p.classList.add('hidden');
+}
+function pickDmEmoji(e){
+  const inp = document.getElementById('dmInput');
+  inp.value += e;
+  inp.focus();
+}
+
+function leave(){ location.reload(); }
+</script>
+</body>
+</html>
